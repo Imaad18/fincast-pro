@@ -1,0 +1,6 @@
+plotly
+prophet
+statsmodels
+scikit-learn
+xgboost
+openpyxl
