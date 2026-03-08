@@ -1,1144 +1,1221 @@
 """
-FinCast Pro — Financial Forecasting Platform
-For Finance Analysts / FP&A Teams
-Author: Built with Streamlit + Prophet + ARIMA + XGBoost + Monte Carlo
+FinCast Pro — Institutional Financial Forecasting Platform
+Designed for FP&A Teams & Finance Analysts
 """
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
 from plotly.subplots import make_subplots
 import warnings
 import io
-import base64
-from datetime import datetime, timedelta
+from datetime import datetime
 
 warnings.filterwarnings("ignore")
 
-# ── Page Config ────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# PAGE CONFIG
+# ═══════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="FinCast Pro",
-    page_icon="📈",
+    page_title="FinCast Pro | Institutional Forecasting",
+    page_icon="◈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── Dark Professional Theme ────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# DESIGN SYSTEM — Institutional Dark Theme
+# Palette: Deep slate + warm gold + cream text
+# Fonts: Playfair Display · IBM Plex Mono · Syne
+# ═══════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=IBM+Plex+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700&display=swap');
 
-  :root {
-    --bg-primary:    #09090f;
-    --bg-card:       #111118;
-    --bg-elevated:   #16161f;
-    --border:        #1e1e2e;
-    --accent:        #00d4ff;
-    --accent-dim:    rgba(0,212,255,0.12);
-    --accent-glow:   rgba(0,212,255,0.25);
-    --green:         #00ff87;
-    --red:           #ff4757;
-    --yellow:        #ffd32a;
-    --text-primary:  #e8e8f0;
-    --text-secondary:#8888aa;
-    --text-muted:    #44445a;
-  }
+:root {
+  --bg-0:        #09090e;
+  --bg-1:        #0e0f17;
+  --bg-2:        #13141e;
+  --bg-3:        #191a26;
+  --border-dim:  #1e2030;
+  --border:      #252840;
+  --gold:        #c8a951;
+  --gold-dim:    rgba(200,169,81,0.12);
+  --gold-glow:   rgba(200,169,81,0.30);
+  --cream:       #e8e2d5;
+  --cream-dim:   #9e9888;
+  --cream-muted: #4a4a5e;
+  --green:       #3ecf8e;
+  --green-dim:   rgba(62,207,142,0.12);
+  --red:         #f25f5c;
+  --red-dim:     rgba(242,95,92,0.12);
+  --blue:        #5b8dee;
+  --blue-dim:    rgba(91,141,238,0.12);
+  --amber:       #f0a500;
+  --shadow:      0 4px 24px rgba(0,0,0,0.5);
+}
 
-  html, body, [class*="css"] {
-    font-family: 'Space Grotesk', sans-serif;
-    background-color: var(--bg-primary) !important;
-    color: var(--text-primary) !important;
-  }
+html, body, [class*="css"], .stApp {
+  font-family: 'Syne', sans-serif !important;
+  background-color: var(--bg-0) !important;
+  color: var(--cream) !important;
+}
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-1); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-  /* Sidebar */
-  section[data-testid="stSidebar"] {
-    background-color: var(--bg-card) !important;
-    border-right: 1px solid var(--border) !important;
-  }
-  section[data-testid="stSidebar"] * { color: var(--text-primary) !important; }
+section[data-testid="stSidebar"] {
+  background: var(--bg-1) !important;
+  border-right: 1px solid var(--border-dim) !important;
+  padding-top: 0 !important;
+}
+section[data-testid="stSidebar"] > div { padding-top: 0 !important; }
+section[data-testid="stSidebar"] * { color: var(--cream) !important; }
 
-  /* Main */
-  .main .block-container { padding: 1.5rem 2rem 3rem; max-width: 1400px; }
+.main .block-container { padding: 0 2.5rem 4rem !important; max-width: 1600px !important; }
 
-  /* Metric cards */
-  .metric-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.25rem 1.5rem;
-    position: relative;
-    overflow: hidden;
-  }
-  .metric-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--accent), transparent);
-  }
-  .metric-label {
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    margin-bottom: 0.4rem;
-  }
-  .metric-value {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
-    line-height: 1;
-  }
-  .metric-delta-pos { color: var(--green); font-size: 0.82rem; margin-top: 0.3rem; }
-  .metric-delta-neg { color: var(--red);   font-size: 0.82rem; margin-top: 0.3rem; }
+.fincast-topbar {
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--border-dim);
+  padding: 0.85rem 2.5rem;
+  margin: 0 -2.5rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fincast-logo-mark {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--cream);
+}
+.fincast-logo-mark span { color: var(--gold); }
+.fincast-logo-tag {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cream-dim);
+  border-left: 1px solid var(--border);
+  padding-left: 0.6rem;
+  margin-left: 0.75rem;
+}
+.fincast-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7rem;
+  color: var(--cream-muted);
+  text-align: right;
+  line-height: 1.6;
+}
 
-  /* Section headers */
-  .section-header {
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin: 1.8rem 0 0.8rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  .section-header::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
+.sidebar-brand {
+  background: linear-gradient(135deg, var(--bg-2), var(--bg-3));
+  border-bottom: 1px solid var(--border-dim);
+  padding: 1.25rem 1.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.sidebar-brand-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cream);
+}
+.sidebar-brand-title em { color: var(--gold); font-style: normal; }
+.sidebar-brand-sub {
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cream-muted);
+  margin-top: 0.15rem;
+}
 
-  /* Logo / title bar */
-  .app-header {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    padding: 0.5rem 0 1.5rem;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 1.5rem;
-  }
-  .app-title {
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
-  }
-  .app-title span { color: var(--accent); }
-  .app-subtitle {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    font-weight: 400;
-  }
+.sb-section {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  padding: 1rem 1.5rem 0.3rem;
+  display: block;
+}
 
-  /* Status badges */
-  .badge-success {
-    background: rgba(0,255,135,0.12);
-    color: var(--green);
-    border: 1px solid rgba(0,255,135,0.25);
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 600;
-  }
-  .badge-info {
-    background: var(--accent-dim);
-    color: var(--accent);
-    border: 1px solid var(--accent-glow);
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 600;
-  }
-  .badge-warn {
-    background: rgba(255,211,42,0.12);
-    color: var(--yellow);
-    border: 1px solid rgba(255,211,42,0.25);
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 600;
-  }
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5,1fr);
+  gap: 1px;
+  background: var(--border-dim);
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 2rem;
+}
+.kpi-cell {
+  background: var(--bg-1);
+  padding: 1.1rem 1.25rem 1rem;
+  position: relative;
+  transition: background 0.2s;
+}
+.kpi-cell:hover { background: var(--bg-2); }
+.kpi-cell.accent::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--gold);
+}
+.kpi-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cream-muted);
+  margin-bottom: 0.5rem;
+}
+.kpi-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.55rem;
+  font-weight: 400;
+  color: var(--cream);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.kpi-sub { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; margin-top: 0.35rem; }
+.pos { color: var(--green); }
+.neg { color: var(--red); }
+.neu { color: var(--cream-dim); }
+.warn { color: var(--amber); }
 
-  /* Model comparison table */
-  .model-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-    margin-top: 0.5rem;
-  }
-  .model-table th {
-    background: var(--bg-elevated);
-    color: var(--text-secondary);
-    font-weight: 600;
-    font-size: 0.7rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 0.7rem 1rem;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-  }
-  .model-table td {
-    padding: 0.65rem 1rem;
-    border-bottom: 1px solid var(--border);
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--text-primary);
-  }
-  .model-table tr:last-child td { border-bottom: none; }
-  .model-table tr.best-model td { background: var(--accent-dim); }
-  .model-table tr:hover td { background: var(--bg-elevated); }
-  .best-label {
-    background: var(--accent);
-    color: #000;
-    padding: 1px 8px;
-    border-radius: 10px;
-    font-size: 0.65rem;
-    font-weight: 700;
-    margin-left: 6px;
-  }
+.sec-div { display: flex; align-items: center; gap: 0.75rem; margin: 2rem 0 1rem; }
+.sec-div-label {
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--gold); white-space: nowrap;
+}
+.sec-div-line { flex: 1; height: 1px; background: var(--border-dim); }
 
-  /* Insight boxes */
-  .insight-box {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--accent);
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    margin: 0.5rem 0;
-    font-size: 0.875rem;
-    color: var(--text-primary);
-    line-height: 1.6;
-  }
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--border-dim);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
 
-  /* Streamlit overrides */
-  .stSelectbox > div > div, .stMultiSelect > div > div {
-    background-color: var(--bg-elevated) !important;
-    border-color: var(--border) !important;
-    color: var(--text-primary) !important;
-  }
-  .stSlider > div > div > div { background: var(--accent) !important; }
-  .stButton > button {
-    background: var(--accent) !important;
-    color: #000 !important;
-    font-weight: 700 !important;
-    border: none !important;
-    border-radius: 8px !important;
-    padding: 0.5rem 1.5rem !important;
-    letter-spacing: 0.05em !important;
-    transition: all 0.2s !important;
-  }
-  .stButton > button:hover { opacity: 0.85 !important; }
+.analyst-note {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--gold);
+  border-radius: 6px;
+  padding: 0.9rem 1.2rem;
+  margin: 0.75rem 0;
+  font-size: 0.83rem;
+  color: var(--cream-dim);
+  line-height: 1.7;
+}
+.analyst-note strong { color: var(--cream); }
+.note-head {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--gold); margin-bottom: 0.4rem;
+}
 
-  div[data-testid="stFileUploader"] {
-    background: var(--bg-elevated) !important;
-    border: 1px dashed var(--border) !important;
-    border-radius: 10px !important;
-  }
+.signal-box {
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0.4rem 0;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.signal-box.bullish { background: var(--green-dim); border: 1px solid rgba(62,207,142,0.2); }
+.signal-box.bearish { background: var(--red-dim);   border: 1px solid rgba(242,95,92,0.2); }
+.signal-box.neutral { background: var(--bg-2);      border: 1px solid var(--border); }
+.signal-box.caution { background: rgba(240,165,0,0.08); border: 1px solid rgba(240,165,0,0.2); }
+.signal-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.05rem; }
+.signal-text { color: var(--cream-dim); line-height: 1.55; }
+.signal-text strong { color: var(--cream); }
 
-  div.stTabs [data-baseweb="tab-list"] {
-    background: var(--bg-card) !important;
-    border-bottom: 1px solid var(--border) !important;
-    gap: 0;
-  }
-  div.stTabs [data-baseweb="tab"] {
-    background: transparent !important;
-    color: var(--text-secondary) !important;
-    font-weight: 500 !important;
-    border-radius: 0 !important;
-    padding: 0.6rem 1.25rem !important;
-    font-size: 0.82rem !important;
-    letter-spacing: 0.04em !important;
-  }
-  div.stTabs [aria-selected="true"] {
-    color: var(--accent) !important;
-    border-bottom: 2px solid var(--accent) !important;
-    background: var(--accent-dim) !important;
-  }
+.anom-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem 0.9rem; border-radius: 4px;
+  background: rgba(242,95,92,0.07); border-left: 2px solid var(--red);
+  margin: 0.2rem 0;
+  font-family: 'IBM Plex Mono', monospace; font-size: 0.77rem;
+}
+.anom-date { color: var(--cream-muted); }
+.anom-val  { color: var(--cream); }
+.anom-dev  { color: var(--red); font-weight: 500; }
 
-  div[data-testid="stExpander"] {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 8px !important;
-  }
+.lb-table { width: 100%; border-collapse: collapse; }
+.lb-table th {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--cream-muted);
+  padding: 0.6rem 1rem; text-align: left;
+  border-bottom: 1px solid var(--border-dim); background: var(--bg-2);
+}
+.lb-table td {
+  padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-dim);
+  font-family: 'IBM Plex Mono', monospace; font-size: 0.82rem; color: var(--cream);
+}
+.lb-table tr:last-child td { border-bottom: none; }
+.lb-table tr.lb-winner td { background: rgba(200,169,81,0.06); }
+.lb-table tr:hover td { background: var(--bg-2); }
+.lb-rank {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  font-size: 0.65rem; font-weight: 700; margin-right: 0.5rem;
+  background: var(--border); color: var(--cream-dim);
+}
+.lb-rank.gold   { background: var(--gold); color: #000; }
+.lb-rank.silver { background: #8a8a9a; color: #000; }
+.lb-rank.bronze { background: #8b6914; color: #fff; }
+.model-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.5rem; }
 
-  .stDataFrame { background: var(--bg-card) !important; }
+.stat-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.45rem 0; border-bottom: 1px solid var(--border-dim); font-size: 0.82rem;
+}
+.stat-row:last-child { border-bottom: none; }
+.stat-key { color: var(--cream-muted); }
+.stat-val { font-family: 'IBM Plex Mono', monospace; color: var(--cream); }
 
-  .stAlert {
-    background: var(--bg-elevated) !important;
-    border-color: var(--border) !important;
-  }
+.export-card {
+  background: var(--bg-1); border: 1px solid var(--border-dim);
+  border-radius: 8px; padding: 1.25rem 1.5rem; height: 100%;
+}
+.export-card-title { font-size: 0.78rem; font-weight: 700; color: var(--cream); margin-bottom: 0.35rem; }
+.export-card-desc  { font-size: 0.76rem; color: var(--cream-muted); line-height: 1.55; margin-bottom: 1rem; }
 
-  /* Anomaly callout */
-  .anomaly-row {
-    background: rgba(255,71,87,0.08);
-    border-left: 3px solid var(--red);
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.8rem;
-    margin: 0.2rem 0;
-    color: var(--text-primary);
-  }
+.badge {
+  display: inline-block; padding: 1px 9px; border-radius: 3px;
+  font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.badge-gold    { background: var(--gold-dim); color: var(--gold); border: 1px solid var(--gold-glow); }
+.badge-green   { background: var(--green-dim); color: var(--green); border: 1px solid rgba(62,207,142,0.25); }
+.badge-neutral { background: var(--bg-3); color: var(--cream-dim); border: 1px solid var(--border); }
 
-  /* Hide default streamlit elements */
-  #MainMenu, footer, header { visibility: hidden; }
-  .viewerBadge_container__1QSob { display: none; }
+.empty-state { text-align: center; padding: 5rem 2rem; }
+.empty-state-icon { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.3; }
+.empty-state-msg  { font-size: 0.9rem; color: var(--cream-muted); }
+.empty-state-sub  { font-size: 0.76rem; color: var(--cream-muted); opacity: 0.5; margin-top: 0.4rem; }
+
+div.stTabs [data-baseweb="tab-list"] {
+  background: var(--bg-1) !important; border-bottom: 1px solid var(--border-dim) !important;
+  gap: 0 !important; padding: 0 !important;
+}
+div.stTabs [data-baseweb="tab"] {
+  background: transparent !important; color: var(--cream-muted) !important;
+  font-family: 'Syne', sans-serif !important; font-weight: 500 !important;
+  font-size: 0.78rem !important; letter-spacing: 0.05em !important;
+  padding: 0.75rem 1.5rem !important; border-radius: 0 !important;
+  border-bottom: 2px solid transparent !important;
+}
+div.stTabs [aria-selected="true"] {
+  color: var(--gold) !important; border-bottom: 2px solid var(--gold) !important;
+  background: rgba(200,169,81,0.05) !important;
+}
+div.stTabs [data-baseweb="tab"]:hover { color: var(--cream) !important; background: var(--bg-2) !important; }
+
+.stButton > button {
+  background: var(--gold) !important; color: #0a0a0f !important;
+  font-family: 'Syne', sans-serif !important; font-weight: 700 !important;
+  font-size: 0.78rem !important; letter-spacing: 0.1em !important;
+  text-transform: uppercase !important; border: none !important;
+  border-radius: 4px !important; padding: 0.6rem 1.5rem !important; width: 100% !important;
+}
+.stButton > button:hover { opacity: 0.85 !important; }
+
+.stSelectbox > div > div, .stMultiSelect > div > div {
+  background: var(--bg-2) !important; border: 1px solid var(--border) !important;
+  border-radius: 4px !important; color: var(--cream) !important; font-size: 0.82rem !important;
+}
+
+div[data-testid="stFileUploader"] {
+  background: var(--bg-2) !important; border: 1px dashed var(--border) !important; border-radius: 6px !important;
+}
+.stCheckbox label { font-size: 0.8rem !important; color: var(--cream-dim) !important; }
+
+div[data-testid="stDownloadButton"] > button {
+  background: transparent !important; color: var(--gold) !important;
+  border: 1px solid var(--gold-glow) !important;
+  font-size: 0.76rem !important; letter-spacing: 0.08em !important;
+  padding: 0.45rem 1rem !important; width: auto !important;
+}
+div[data-testid="stDownloadButton"] > button:hover { background: var(--gold-dim) !important; opacity: 1 !important; }
+
+#MainMenu, footer, header { visibility: hidden; }
+hr { border-color: var(--border-dim) !important; margin: 1.5rem 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Plotly default theme ───────────────────────────────────────────────────────
-CHART_LAYOUT = dict(
-    paper_bgcolor="#09090f",
-    plot_bgcolor="#09090f",
-    font=dict(family="Space Grotesk", color="#8888aa", size=12),
-    xaxis=dict(gridcolor="#1e1e2e", linecolor="#1e1e2e", zeroline=False, tickfont=dict(color="#8888aa")),
-    yaxis=dict(gridcolor="#1e1e2e", linecolor="#1e1e2e", zeroline=False, tickfont=dict(color="#8888aa")),
-    legend=dict(bgcolor="#111118", bordercolor="#1e1e2e", borderwidth=1,
-                font=dict(color="#8888aa", size=11)),
-    margin=dict(l=20, r=20, t=40, b=20),
+# ═══════════════════════════════════════════════════════════════
+# CHART CONFIG
+# ═══════════════════════════════════════════════════════════════
+import copy
+
+_BASE_LAYOUT = dict(
+    paper_bgcolor="#09090e", plot_bgcolor="#09090e",
+    font=dict(family="Syne", color="#4a4a5e", size=11),
+    xaxis=dict(
+        gridcolor="#13141e", gridwidth=1, linecolor="#1e2030", zeroline=False,
+        tickfont=dict(color="#4a4a5e", size=10, family="IBM Plex Mono"),
+        showspikes=True, spikecolor="#252840", spikethickness=1, spikedash="solid",
+    ),
+    yaxis=dict(
+        gridcolor="#13141e", gridwidth=1, linecolor="#1e2030", zeroline=False,
+        tickfont=dict(color="#4a4a5e", size=10, family="IBM Plex Mono"),
+    ),
+    legend=dict(
+        bgcolor="rgba(14,15,23,0.9)", bordercolor="#252840", borderwidth=1,
+        font=dict(color="#9e9888", size=10, family="Syne"), itemsizing="constant",
+    ),
+    margin=dict(l=10, r=10, t=40, b=10),
     hovermode="x unified",
-    hoverlabel=dict(bgcolor="#16161f", bordercolor="#1e1e2e",
-                    font=dict(color="#e8e8f0", size=12)),
+    hoverlabel=dict(
+        bgcolor="#13141e", bordercolor="#252840",
+        font=dict(color="#e8e2d5", size=11, family="IBM Plex Mono"), namelength=-1,
+    ),
+    dragmode="zoom",
 )
 
-COLORS = {
-    "actual":    "#8888aa",
-    "prophet":   "#00d4ff",
-    "arima":     "#00ff87",
-    "xgb":       "#ffd32a",
-    "monte":     "#ff6b9d",
-    "best":      "#00d4ff",
-    "worst":     "#ff4757",
-    "ci_upper":  "rgba(0,212,255,0.15)",
-    "ci_lower":  "rgba(0,212,255,0.05)",
+def cly(**extra):
+    lyt = copy.deepcopy(_BASE_LAYOUT)
+    lyt.update(extra)
+    return lyt
+
+C = {
+    "actual":   "#6b6b82",
+    "prophet":  "#c8a951",
+    "arima":    "#5b8dee",
+    "xgboost":  "#3ecf8e",
+    "montecarlo":"#f25f5c",
+    "ensemble": "#d4a0ff",
 }
 
-# ══════════════════════════════════════════════════════════════════════════════
+def model_color(name):
+    return C.get(name.lower().replace(" ",""), "#9e9888")
+
+# ═══════════════════════════════════════════════════════════════
 # DATA UTILITIES
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 
-def generate_sample_revenue(n=36):
-    """Realistic monthly revenue with trend + seasonality + noise."""
+def gen_revenue(n=48):
     np.random.seed(42)
-    dates = pd.date_range(end=datetime.today().replace(day=1), periods=n, freq="MS")
-    trend  = np.linspace(500_000, 820_000, n)
-    season = 60_000 * np.sin(2 * np.pi * np.arange(n) / 12 - np.pi / 3)
-    noise  = np.random.normal(0, 18_000, n)
-    values = trend + season + noise
-    values = np.clip(values, 0, None)
-    return pd.DataFrame({"ds": dates, "y": values.round(2)})
+    dates  = pd.date_range(end=datetime.today().replace(day=1), periods=n, freq="MS")
+    trend  = np.linspace(480_000, 880_000, n)
+    season = 75_000 * np.sin(2*np.pi*np.arange(n)/12 - np.pi/3)
+    noise  = np.random.normal(0, 22_000, n)
+    vals   = np.clip(trend+season+noise, 0, None)
+    vals[n-4] *= 0.14   # inject anomaly
+    return pd.DataFrame({"ds": dates, "y": vals.round(0)})
 
-
-def generate_sample_stock(n=500):
-    """Geometric Brownian Motion for stock price."""
+def gen_stock(n=500):
     np.random.seed(7)
-    dates  = pd.date_range(end=datetime.today(), periods=n, freq="B")
-    drift  = 0.0004
-    vol    = 0.016
-    shocks = np.random.normal(drift, vol, n)
-    price  = 100 * np.exp(np.cumsum(shocks))
+    dates = pd.date_range(end=datetime.today(), periods=n, freq="B")
+    shocks = np.random.normal(0.0003, 0.015, n)
+    price  = 120 * np.exp(np.cumsum(shocks))
     return pd.DataFrame({"ds": dates, "y": price.round(4)})
 
-
-def detect_anomalies_iqr(series: pd.Series, factor=2.0):
+def detect_anomalies(series, factor=2.0):
     q1, q3 = series.quantile(0.25), series.quantile(0.75)
-    iqr     = q3 - q1
-    lo, hi  = q1 - factor * iqr, q3 + factor * iqr
-    return (series < lo) | (series > hi)
+    iqr = q3 - q1
+    lo, hi = q1 - factor*iqr, q3 + factor*iqr
+    return (series < lo) | (series > hi), lo, hi
 
+def cagr(series, freq):
+    ppy = {"MS":12,"W":52,"B":252,"QS":4}.get(freq,12)
+    n   = len(series)/ppy
+    if n <= 0 or series.iloc[0] <= 0: return 0.0
+    return ((series.iloc[-1]/series.iloc[0])**(1/n)-1)*100
 
-def smape(actual, forecast):
-    a, f = np.array(actual), np.array(forecast)
-    mask = ~(np.isnan(a) | np.isnan(f))
-    return 100 * np.mean(2 * np.abs(f[mask] - a[mask]) / (np.abs(a[mask]) + np.abs(f[mask]) + 1e-9))
+def max_drawdown(series):
+    dd = (series - series.cummax()) / series.cummax()
+    return dd.min()*100
 
+def sharpe(series, freq, rfr=0.05):
+    ppy  = {"MS":12,"W":52,"B":252,"QS":4}.get(freq,12)
+    rets = series.pct_change().dropna()
+    if rets.std() == 0: return 0.0
+    return (rets.mean()*ppy - rfr) / (rets.std()*np.sqrt(ppy))
 
-def rmse(actual, forecast):
-    a, f = np.array(actual), np.array(forecast)
-    mask = ~(np.isnan(a) | np.isnan(f))
-    return np.sqrt(np.mean((a[mask] - f[mask]) ** 2))
+def mape(a,f):
+    a,f = np.array(a), np.array(f)
+    m   = (a!=0)&~np.isnan(a)&~np.isnan(f)
+    return 100*np.mean(np.abs((a[m]-f[m])/a[m]))
 
+def smape(a,f):
+    a,f = np.array(a), np.array(f)
+    m   = ~(np.isnan(a)|np.isnan(f))
+    return 100*np.mean(2*np.abs(f[m]-a[m])/(np.abs(a[m])+np.abs(f[m])+1e-9))
 
-def mape(actual, forecast):
-    a, f = np.array(actual), np.array(forecast)
-    mask = (a != 0) & ~np.isnan(a) & ~np.isnan(f)
-    return 100 * np.mean(np.abs((a[mask] - f[mask]) / a[mask]))
+def rmse(a,f):
+    a,f = np.array(a), np.array(f)
+    m   = ~(np.isnan(a)|np.isnan(f))
+    return np.sqrt(np.mean((a[m]-f[m])**2))
 
+# ═══════════════════════════════════════════════════════════════
+# MODEL RUNNERS
+# ═══════════════════════════════════════════════════════════════
 
-# ══════════════════════════════════════════════════════════════════════════════
-# MODEL WRAPPERS  — each returns (forecast_df, in_sample_pred)
-# ══════════════════════════════════════════════════════════════════════════════
+def _offset(freq):
+    try:
+        return pd.tseries.frequencies.to_offset(freq)
+    except Exception:
+        return pd.DateOffset(months=1)
 
-def run_prophet(df: pd.DataFrame, horizon: int, freq: str = "MS",
-                yearly_seasonality=True, weekly_seasonality=False, daily_seasonality=False):
+def run_prophet(df, horizon, freq):
     try:
         from prophet import Prophet
-        m = Prophet(
-            yearly_seasonality=yearly_seasonality,
-            weekly_seasonality=weekly_seasonality,
-            daily_seasonality=daily_seasonality,
-            interval_width=0.9,
-            changepoint_prior_scale=0.05,
-        )
-        m.fit(df[["ds", "y"]])
+        m = Prophet(yearly_seasonality=True, weekly_seasonality=False,
+                    daily_seasonality=False, interval_width=0.90,
+                    changepoint_prior_scale=0.05)
+        m.fit(df[["ds","y"]])
         future = m.make_future_dataframe(periods=horizon, freq=freq)
-        fc     = m.predict(future)
-        fwd    = fc[fc["ds"] > df["ds"].max()][["ds", "yhat", "yhat_lower", "yhat_upper"]]
-        insample = fc[fc["ds"] <= df["ds"].max()][["ds", "yhat"]].rename(columns={"yhat": "y_pred"})
-        fwd.columns = ["ds", "yhat", "lower", "upper"]
-        return fwd, insample
-    except ImportError:
-        return None, None
-
-
-def run_arima(df: pd.DataFrame, horizon: int, freq: str = "MS"):
-    try:
-        from statsmodels.tsa.statespace.sarimax import SARIMAX
-        series = df.set_index("ds")["y"]
-        # Auto-detect seasonality period
-        s = 12 if freq in ("MS", "M", "ME") else (5 if freq == "B" else 7)
-        order        = (1, 1, 1)
-        seasonal_order = (1, 1, 0, s) if len(series) >= 2 * s else (0, 0, 0, 0)
-        model = SARIMAX(series, order=order, seasonal_order=seasonal_order,
-                        enforce_stationarity=False, enforce_invertibility=False)
-        res  = model.fit(disp=False, maxiter=200)
-        fc   = res.get_forecast(steps=horizon)
-        fwd_mean = fc.predicted_mean
-        ci        = fc.conf_int(alpha=0.10)
-        fwd_dates = pd.date_range(start=df["ds"].max() + pd.tseries.frequencies.to_offset(freq),
-                                  periods=horizon, freq=freq)
-        fwd = pd.DataFrame({
-            "ds":    fwd_dates,
-            "yhat":  fwd_mean.values,
-            "lower": ci.iloc[:, 0].values,
-            "upper": ci.iloc[:, 1].values,
-        })
-        in_sample_pred = pd.DataFrame({
-            "ds":     series.index,
-            "y_pred": res.fittedvalues.values,
-        })
-        return fwd, in_sample_pred
+        fc = m.predict(future)
+        fwd = fc[fc["ds"]>df["ds"].max()][["ds","yhat","yhat_lower","yhat_upper"]].copy()
+        fwd.columns = ["ds","yhat","lower","upper"]
+        ins = fc[fc["ds"]<=df["ds"].max()][["ds","yhat"]].rename(columns={"yhat":"y_pred"})
+        return fwd.reset_index(drop=True), ins.reset_index(drop=True)
     except Exception:
         return None, None
 
-
-def run_xgboost(df: pd.DataFrame, horizon: int, freq: str = "MS", n_lags: int = 12):
+def run_arima(df, horizon, freq):
     try:
-        import xgboost as xgb
-        from sklearn.model_selection import TimeSeriesSplit
-        series = df["y"].values.astype(float)
-        n      = len(series)
-        # Feature engineering
-        def make_features(s, lags):
-            X, y_arr = [], []
-            for i in range(lags, len(s)):
-                row = list(s[i - lags:i])
-                # rolling stats
-                row += [np.mean(s[i - lags:i]), np.std(s[i - lags:i]),
-                        np.min(s[i - lags:i]),  np.max(s[i - lags:i])]
-                X.append(row); y_arr.append(s[i])
-            return np.array(X), np.array(y_arr)
-
-        X, y_arr = make_features(series, n_lags)
-        split = max(1, int(len(X) * 0.2))
-        X_tr, y_tr = X[:-split], y_arr[:-split]
-        X_val, y_val = X[-split:], y_arr[-split:]
-
-        model = xgb.XGBRegressor(
-            n_estimators=400, learning_rate=0.05, max_depth=4,
-            subsample=0.8, colsample_bytree=0.8,
-            random_state=42, verbosity=0,
-        )
-        model.fit(X_tr, y_tr, eval_set=[(X_val, y_val)],
-                  verbose=False)
-
-        # In-sample predictions
-        X_all, y_all = make_features(series, n_lags)
-        in_sample_vals = model.predict(X_all)
-        in_sample_pred = pd.DataFrame({
-            "ds":     df["ds"].iloc[n_lags:].values,
-            "y_pred": in_sample_vals,
-        })
-
-        # Recursive multi-step forecast with MC uncertainty
-        last_window = list(series[-n_lags:])
-        forecasts, lower, upper = [], [], []
-        for _ in range(horizon):
-            row = np.array(last_window[-n_lags:])
-            feats = np.concatenate([row, [np.mean(row), np.std(row),
-                                          np.min(row), np.max(row)]])
-            pred  = float(model.predict(feats.reshape(1, -1))[0])
-            # Bootstrap uncertainty
-            noise_std = np.std(series) * 0.05
-            forecasts.append(pred)
-            lower.append(pred - 1.645 * noise_std * np.sqrt(_ + 1))
-            upper.append(pred + 1.645 * noise_std * np.sqrt(_ + 1))
-            last_window.append(pred)
-
-        fwd_dates = pd.date_range(
-            start=df["ds"].max() + pd.tseries.frequencies.to_offset(freq),
-            periods=horizon, freq=freq,
-        )
-        fwd = pd.DataFrame({
-            "ds":    fwd_dates,
-            "yhat":  forecasts,
-            "lower": lower,
-            "upper": upper,
-        })
-        return fwd, in_sample_pred
-    except Exception as e:
+        from statsmodels.tsa.statespace.sarimax import SARIMAX
+        series = df.set_index("ds")["y"]
+        s      = {"MS":12,"W":52,"B":5,"QS":4}.get(freq,12)
+        seas   = (1,1,0,s) if len(series)>=2*s else (0,0,0,0)
+        res    = SARIMAX(series, order=(1,1,1), seasonal_order=seas,
+                         enforce_stationarity=False, enforce_invertibility=False
+                         ).fit(disp=False, maxiter=200)
+        fc     = res.get_forecast(steps=horizon)
+        ci     = fc.conf_int(alpha=0.10)
+        dates  = pd.date_range(start=df["ds"].max()+_offset(freq), periods=horizon, freq=freq)
+        fwd    = pd.DataFrame({"ds":dates,"yhat":fc.predicted_mean.values,
+                               "lower":ci.iloc[:,0].values,"upper":ci.iloc[:,1].values})
+        ins    = pd.DataFrame({"ds":series.index,"y_pred":res.fittedvalues.values})
+        return fwd.reset_index(drop=True), ins.reset_index(drop=True)
+    except Exception:
         return None, None
 
+def run_xgboost(df, horizon, freq, n_lags=12):
+    try:
+        import xgboost as xgb
+        s = df["y"].values.astype(float)
+        def feat(arr, lags):
+            X,y=[],[]
+            for i in range(lags,len(arr)):
+                w=arr[i-lags:i]
+                X.append([*w,np.mean(w),np.std(w),np.min(w),np.max(w),w[-1]-w[0],w[-1]/(np.mean(w)+1e-9)])
+                y.append(arr[i])
+            return np.array(X),np.array(y)
+        X,ya=feat(s,n_lags)
+        sp=max(1,int(len(X)*0.15))
+        mdl=xgb.XGBRegressor(n_estimators=500,learning_rate=0.04,max_depth=4,
+                               subsample=0.8,colsample_bytree=0.8,random_state=42,verbosity=0)
+        mdl.fit(X[:-sp],ya[:-sp],eval_set=[(X[-sp:],ya[-sp:])],verbose=False)
+        Xa,_=feat(s,n_lags)
+        ins=pd.DataFrame({"ds":df["ds"].iloc[n_lags:].values,"y_pred":mdl.predict(Xa)})
+        win=list(s[-n_lags:])
+        yhats,lows,highs=[],[],[]
+        ns=np.std(s)*0.04
+        for step in range(horizon):
+            w=np.array(win[-n_lags:])
+            f_=np.array([*w,np.mean(w),np.std(w),np.min(w),np.max(w),w[-1]-w[0],w[-1]/(np.mean(w)+1e-9)]).reshape(1,-1)
+            p=float(mdl.predict(f_)[0])
+            sp2=ns*np.sqrt(step+1)*1.645
+            yhats.append(p);lows.append(p-sp2);highs.append(p+sp2);win.append(p)
+        dates=pd.date_range(start=df["ds"].max()+_offset(freq),periods=horizon,freq=freq)
+        fwd=pd.DataFrame({"ds":dates,"yhat":yhats,"lower":lows,"upper":highs})
+        return fwd.reset_index(drop=True), ins.reset_index(drop=True)
+    except Exception:
+        return None, None
 
-def run_monte_carlo(df: pd.DataFrame, horizon: int, freq: str = "MS",
-                    n_simulations: int = 1000, scenario: str = "base"):
-    """GBM-based Monte Carlo with scenario adjustments."""
-    series  = df["y"].values.astype(float)
-    log_ret = np.diff(np.log(series + 1e-9))
-    mu      = np.mean(log_ret)
-    sigma   = np.std(log_ret)
+def run_monte_carlo(df, horizon, freq, n_sims=1000, scenario="base"):
+    s       = df["y"].values.astype(float)
+    lr      = np.diff(np.log(s+1e-9))
+    mu,sig  = np.mean(lr), np.std(lr)
+    tm,ts   = {"best":(1.5,0.65),"base":(1.0,1.0),"worst":(0.3,1.5)}.get(scenario,(1.0,1.0))
+    np.random.seed(99)
+    last    = s[-1]
+    paths   = np.zeros((n_sims,horizon))
+    for i in range(n_sims):
+        shocks=np.random.normal(mu*tm,sig*ts,horizon)
+        paths[i]=last*np.exp(np.cumsum(shocks))
+    dates = pd.date_range(start=df["ds"].max()+_offset(freq),periods=horizon,freq=freq)
+    fwd   = pd.DataFrame({"ds":dates,
+                           "yhat":np.percentile(paths,50,axis=0),
+                           "lower":np.percentile(paths,10,axis=0),
+                           "upper":np.percentile(paths,90,axis=0)})
+    return fwd.reset_index(drop=True), paths
 
-    # Scenario tweaks
-    scen_mu = {"best": mu * 1.4, "base": mu, "worst": mu * 0.4}
-    scen_sig = {"best": sigma * 0.7, "base": sigma, "worst": sigma * 1.4}
-    mu_use    = scen_mu.get(scenario, mu)
-    sigma_use = scen_sig.get(scenario, sigma)
+def ensemble(forecasts):
+    valid = {k:v for k,v in forecasts.items() if v is not None}
+    if len(valid)<2: return None
+    base = list(valid.values())[0][["ds"]].copy()
+    base["yhat"]  = np.mean([v["yhat"].values  for v in valid.values()],axis=0)
+    base["lower"] = np.mean([v["lower"].values  for v in valid.values()],axis=0)
+    base["upper"] = np.mean([v["upper"].values  for v in valid.values()],axis=0)
+    return base
 
-    np.random.seed(123)
-    last_val = series[-1]
-    paths = np.zeros((n_simulations, horizon))
-    for i in range(n_simulations):
-        shocks = np.random.normal(mu_use, sigma_use, horizon)
-        path   = last_val * np.exp(np.cumsum(shocks))
-        paths[i] = path
+# ═══════════════════════════════════════════════════════════════
+# CHARTS
+# ═══════════════════════════════════════════════════════════════
 
-    p10 = np.percentile(paths, 10, axis=0)
-    p50 = np.percentile(paths, 50, axis=0)
-    p90 = np.percentile(paths, 90, axis=0)
+def title_style(text):
+    return dict(text=text, font=dict(color="#9e9888",size=12,family="Syne"), x=0.01)
 
-    fwd_dates = pd.date_range(
-        start=df["ds"].max() + pd.tseries.frequencies.to_offset(freq),
-        periods=horizon, freq=freq,
-    )
-    fwd = pd.DataFrame({
-        "ds":    fwd_dates,
-        "yhat":  p50,
-        "lower": p10,
-        "upper": p90,
-    })
-    return fwd, paths
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# CHARTING
-# ══════════════════════════════════════════════════════════════════════════════
-
-def chart_historical(df: pd.DataFrame, anomalies: pd.Series, title: str) -> go.Figure:
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df["ds"], y=df["y"], mode="lines",
-        line=dict(color=COLORS["actual"], width=1.8),
-        name="Historical", fill="tozeroy",
-        fillcolor="rgba(136,136,170,0.06)",
-    ))
-    anom_df = df[anomalies]
-    if not anom_df.empty:
-        fig.add_trace(go.Scatter(
-            x=anom_df["ds"], y=anom_df["y"], mode="markers",
-            marker=dict(color="#ff4757", size=9, symbol="circle-open",
-                        line=dict(width=2, color="#ff4757")),
-            name="Anomaly",
-        ))
-    fig.update_layout(**CHART_LAYOUT, title=dict(text=title, font=dict(color="#e8e8f0", size=14), x=0.01))
+def fig_historical(df, mask, lo, hi):
+    fig=go.Figure()
+    fig.add_trace(go.Scatter(x=df["ds"],y=df["y"],mode="lines",name="Actual",
+        line=dict(color=C["actual"],width=1.8),
+        fill="tozeroy",fillcolor="rgba(107,107,130,0.05)"))
+    if mask.any():
+        adf=df[mask]
+        fig.add_trace(go.Scatter(x=adf["ds"],y=adf["y"],mode="markers",name="Anomaly",
+            marker=dict(color="#f25f5c",size=10,symbol="circle-open",line=dict(width=2,color="#f25f5c"))))
+    fig.add_hline(y=df["y"].mean(),line_dash="dot",line_color="#252840",line_width=1,
+                  annotation_text=f"μ={df['y'].mean():,.0f}",
+                  annotation_font_color="#4a4a5e",annotation_font_size=10,
+                  annotation_position="bottom right")
+    fig.update_layout(**cly(title=title_style("Historical Series  ·  Anomaly Overlay"),height=340))
     return fig
 
-
-def chart_forecast(df: pd.DataFrame, forecasts: dict, title: str) -> go.Figure:
-    fig = go.Figure()
-    # Historical
-    fig.add_trace(go.Scatter(
-        x=df["ds"], y=df["y"], mode="lines",
-        line=dict(color=COLORS["actual"], width=1.8),
-        name="Historical",
-    ))
-    # Vertical divider
-    split = df["ds"].max()
-    fig.add_vline(x=split, line_dash="dot", line_color="#44445a", line_width=1.5)
-
-    model_color = {"Prophet": COLORS["prophet"], "ARIMA": COLORS["arima"],
-                   "XGBoost": COLORS["xgb"],    "Monte Carlo": COLORS["monte"]}
-
-    for name, fwd in forecasts.items():
-        if fwd is None: continue
-        col = model_color.get(name, "#ffffff")
-        # CI fill
-        fig.add_trace(go.Scatter(
-            x=pd.concat([fwd["ds"], fwd["ds"][::-1]]),
-            y=pd.concat([fwd["upper"], fwd["lower"][::-1]]),
-            fill="toself",
-            fillcolor=f"rgba({int(col[1:3],16)},{int(col[3:5],16)},{int(col[5:7],16)},0.10)",
-            line=dict(color="rgba(0,0,0,0)"),
-            showlegend=False, hoverinfo="skip",
-        ))
-        fig.add_trace(go.Scatter(
-            x=fwd["ds"], y=fwd["yhat"], mode="lines",
-            line=dict(color=col, width=2, dash="dot" if name == "ARIMA" else "solid"),
-            name=name,
-        ))
-
-    fig.update_layout(**CHART_LAYOUT, title=dict(text=title, font=dict(color="#e8e8f0", size=14), x=0.01))
+def fig_yoy(df, freq):
+    ppy={"MS":12,"W":52,"B":252,"QS":4}.get(freq,12)
+    yoy=df.set_index("ds")["y"].pct_change(ppy).dropna()*100
+    colors=["#3ecf8e" if v>=0 else "#f25f5c" for v in yoy]
+    fig=go.Figure()
+    fig.add_trace(go.Bar(x=yoy.index,y=yoy.values,marker_color=colors,marker_line=dict(width=0),name="YoY %"))
+    fig.add_hline(y=0,line_color="#252840",line_width=1)
+    fig.update_layout(**cly(title=title_style("Year-over-Year Growth (%)"),height=260,showlegend=False))
     return fig
 
-
-def chart_monte_carlo_fan(df: pd.DataFrame, paths: np.ndarray, fwd_dates, n_show=100) -> go.Figure:
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=df["ds"], y=df["y"], mode="lines",
-        line=dict(color=COLORS["actual"], width=2),
-        name="Historical",
-    ))
-    idx = np.random.choice(paths.shape[0], min(n_show, paths.shape[0]), replace=False)
-    for i in idx:
-        fig.add_trace(go.Scatter(
-            x=fwd_dates, y=paths[i], mode="lines",
-            line=dict(color="rgba(255,107,157,0.07)", width=1),
-            showlegend=False, hoverinfo="skip",
-        ))
-    # Percentile bands
-    for p, label, col in [(90, "P90", "#ff4757"), (50, "Median", "#ff6b9d"), (10, "P10", "#00ff87")]:
-        vals = np.percentile(paths, p, axis=0)
-        fig.add_trace(go.Scatter(
-            x=fwd_dates, y=vals, mode="lines",
-            line=dict(color=col, width=2.5),
-            name=label,
-        ))
-    fig.add_vline(x=df["ds"].max(), line_dash="dot", line_color="#44445a", line_width=1.5)
-    fig.update_layout(**CHART_LAYOUT,
-                      title=dict(text="Monte Carlo Fan Chart — Simulated Paths",
-                                 font=dict(color="#e8e8f0", size=14), x=0.01))
-    return fig
-
-
-def chart_returns_distribution(series: pd.Series) -> go.Figure:
-    rets = series.pct_change().dropna() * 100
-    fig = go.Figure()
-    fig.add_trace(go.Histogram(
-        x=rets, nbinsx=50,
-        marker_color=COLORS["prophet"],
-        marker_line=dict(width=0.5, color="#09090f"),
-        name="Returns (%)",
-    ))
-    mean_r = rets.mean()
-    fig.add_vline(x=mean_r, line_dash="dash", line_color="#ffd32a", line_width=1.5,
-                  annotation_text=f"Mean {mean_r:.2f}%",
-                  annotation_font_color="#ffd32a",
+def fig_returns(series):
+    rets=series.pct_change().dropna()*100
+    fig=go.Figure()
+    fig.add_trace(go.Histogram(x=rets,nbinsx=50,marker_color="rgba(200,169,81,0.7)",
+                               marker_line=dict(width=0.5,color="#09090e"),name="Returns"))
+    fig.add_vline(x=rets.mean(),line_dash="dash",line_color="#3ecf8e",line_width=1.5,
+                  annotation_text=f"μ={rets.mean():.2f}%",
+                  annotation_font_color="#3ecf8e",annotation_font_size=10,
                   annotation_position="top right")
-    fig.update_layout(**CHART_LAYOUT,
-                      title=dict(text="Return Distribution", font=dict(color="#e8e8f0", size=14), x=0.01),
-                      showlegend=False)
+    fig.add_vline(x=0,line_dash="solid",line_color="#252840",line_width=1)
+    fig.update_layout(**cly(title=title_style("Return Distribution (%)"),height=290,showlegend=False))
     return fig
 
+def fig_forecast(df, forecasts, ens):
+    fig=go.Figure()
+    fig.add_trace(go.Scatter(x=df["ds"],y=df["y"],mode="lines",name="Actual",
+                             line=dict(color=C["actual"],width=2)))
+    fig.add_vline(x=df["ds"].max(),line_dash="dot",line_color="#252840",line_width=1.5,
+                  annotation_text="Forecast →",annotation_font_color="#4a4a5e",
+                  annotation_font_size=10,annotation_position="top right")
+    for name in ["Prophet","ARIMA","XGBoost","Monte Carlo"]:
+        fwd=forecasts.get(name)
+        if fwd is None: continue
+        col=model_color(name)
+        r,g,b=int(col[1:3],16),int(col[3:5],16),int(col[5:7],16)
+        fig.add_trace(go.Scatter(
+            x=pd.concat([fwd["ds"],fwd["ds"][::-1]]),
+            y=pd.concat([fwd["upper"],fwd["lower"][::-1]]),
+            fill="toself",showlegend=False,hoverinfo="skip",
+            fillcolor=f"rgba({r},{g},{b},0.08)",line=dict(color="rgba(0,0,0,0)")))
+        fig.add_trace(go.Scatter(x=fwd["ds"],y=fwd["yhat"],mode="lines",name=name,
+            line=dict(color=col,width=2,
+                      dash="dash" if name=="ARIMA" else "dot" if name=="Monte Carlo" else "solid")))
+    if ens is not None:
+        fig.add_trace(go.Scatter(x=ens["ds"],y=ens["yhat"],mode="lines",name="Ensemble",
+                                 line=dict(color=C["ensemble"],width=2.5)))
+    fig.update_layout(**cly(title=title_style("Multi-Model Forecast  ·  90% Confidence Intervals"),height=420))
+    return fig
 
-def chart_model_errors(scores: dict) -> go.Figure:
-    if not scores: return go.Figure()
-    models = list(scores.keys())
-    mapes  = [scores[m]["MAPE"] for m in models]
-    rmses  = [scores[m]["RMSE"] for m in models]
-    colors_bar = [COLORS.get(m.lower().replace(" ", ""), "#8888aa") for m in models]
+def fig_mc_fan(df, paths, dates, n_show=150):
+    fig=go.Figure()
+    fig.add_trace(go.Scatter(x=df["ds"],y=df["y"],mode="lines",name="Historical",
+                             line=dict(color=C["actual"],width=2)))
+    idx=np.random.choice(paths.shape[0],min(n_show,paths.shape[0]),replace=False)
+    for i in idx:
+        fig.add_trace(go.Scatter(x=dates,y=paths[i],mode="lines",
+            line=dict(color="rgba(242,95,92,0.04)",width=1),showlegend=False,hoverinfo="skip"))
+    for p,lbl,col in [(90,"P90","#f25f5c"),(75,"P75","#f0a500"),
+                       (50,"Median","#e8e2d5"),(25,"P25","#3ecf8e"),(10,"P10","#5b8dee")]:
+        vals=np.percentile(paths,p,axis=0)
+        fig.add_trace(go.Scatter(x=dates,y=vals,mode="lines",name=lbl,
+            line=dict(color=col,width=2 if lbl=="Median" else 1.2,
+                      dash="solid" if lbl=="Median" else "dot")))
+    fig.add_vline(x=df["ds"].max(),line_dash="dot",line_color="#252840",line_width=1.5)
+    fig.update_layout(**cly(title=title_style("Monte Carlo Fan  ·  Simulated Paths & Percentile Bands"),height=400))
+    return fig
 
-    fig = make_subplots(rows=1, cols=2,
-                        subplot_titles=["MAPE (%) — Lower is Better",
-                                        "RMSE — Lower is Better"])
-    fig.add_trace(go.Bar(x=models, y=mapes, marker_color=colors_bar, showlegend=False), row=1, col=1)
-    fig.add_trace(go.Bar(x=models, y=rmses, marker_color=colors_bar, showlegend=False), row=1, col=2)
-    fig.update_layout(**CHART_LAYOUT,
-                      paper_bgcolor="#09090f", plot_bgcolor="#09090f",
-                      title=dict(text="Model Accuracy Comparison (In-Sample)",
-                                 font=dict(color="#e8e8f0", size=14), x=0.01))
+def fig_terminal(paths):
+    t=paths[:,-1]
+    fig=go.Figure()
+    fig.add_trace(go.Histogram(x=t,nbinsx=70,marker_color="rgba(242,95,92,0.55)",
+                               marker_line=dict(width=0.3,color="#09090e"),name="Outcomes"))
+    for p,col,lbl in [(5,"#f25f5c","P5 VaR"),(50,"#e8e2d5","Median"),(95,"#3ecf8e","P95")]:
+        fig.add_vline(x=np.percentile(t,p),line_dash="dash",line_color=col,line_width=1.5,
+                      annotation_text=lbl,annotation_font_color=col,annotation_font_size=10,
+                      annotation_position="top")
+    fig.update_layout(**cly(title=title_style("Terminal Value Distribution"),height=300,showlegend=False))
+    return fig
+
+def fig_accuracy(scores):
+    models=[m for m in scores]
+    mapes =[scores[m]["MAPE"]  for m in models]
+    rmses =[scores[m]["RMSE"]  for m in models]
+    cols  =[model_color(m) for m in models]
+    fig   =make_subplots(rows=1,cols=2,subplot_titles=["MAPE % — Lower is Better","RMSE — Lower is Better"])
+    fig.add_trace(go.Bar(x=models,y=mapes,marker_color=cols,showlegend=False,marker_line=dict(width=0)),row=1,col=1)
+    fig.add_trace(go.Bar(x=models,y=rmses,marker_color=cols,showlegend=False,marker_line=dict(width=0)),row=1,col=2)
+    lyt=cly(title=title_style("Model Accuracy  ·  In-Sample"),height=280)
+    lyt["xaxis2"]=copy.deepcopy(lyt["xaxis"])
+    lyt["yaxis2"]=copy.deepcopy(lyt["yaxis"])
+    fig.update_layout(**lyt)
     for ann in fig.layout.annotations:
-        ann.font.color = "#8888aa"
-        ann.font.size  = 11
+        ann.font.color="#4a4a5e"; ann.font.size=10; ann.font.family="Syne"
     return fig
 
+def fig_fit(df, insample_dict):
+    fig=go.Figure()
+    fig.add_trace(go.Scatter(x=df["ds"],y=df["y"],mode="lines",name="Actual",
+                             line=dict(color=C["actual"],width=2.5)))
+    for name,ins in insample_dict.items():
+        col=model_color(name)
+        fig.add_trace(go.Scatter(x=ins["ds"],y=ins["y_pred"],mode="lines",name=name,
+                                 line=dict(color=col,width=1.5,dash="dot")))
+    fig.update_layout(**cly(title=title_style("In-Sample Fit vs Actual"),height=340))
+    return fig
 
-# ══════════════════════════════════════════════════════════════════════════════
-# EXPORT HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
+# UI COMPONENTS
+# ═══════════════════════════════════════════════════════════════
 
-def to_csv_bytes(df: pd.DataFrame) -> bytes:
-    return df.to_csv(index=False).encode()
+def sec(label):
+    st.markdown(f'<div class="sec-div"><span class="sec-div-label">{label}</span><div class="sec-div-line"></div></div>',
+                unsafe_allow_html=True)
 
+def stat(k,v):
+    return f'<div class="stat-row"><span class="stat-key">{k}</span><span class="stat-val">{v}</span></div>'
 
-def to_excel_bytes(dfs: dict) -> bytes:
-    buf = io.BytesIO()
-    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        for sheet, df in dfs.items():
-            df.to_excel(writer, sheet_name=sheet[:31], index=False)
+def note(content, head="Analyst Note"):
+    st.markdown(f'<div class="analyst-note"><div class="note-head">◈ {head}</div>{content}</div>',
+                unsafe_allow_html=True)
+
+def sig(kind, icon, text):
+    st.markdown(f'<div class="signal-box {kind}"><span class="signal-icon">{icon}</span><span class="signal-text">{text}</span></div>',
+                unsafe_allow_html=True)
+
+def empty(msg, sub=""):
+    st.markdown(f'<div class="empty-state"><div class="empty-state-icon">◈</div><div class="empty-state-msg">{msg}</div><div class="empty-state-sub">{sub}</div></div>',
+                unsafe_allow_html=True)
+
+def to_csv(df): return df.to_csv(index=False).encode()
+
+def to_excel(sheets):
+    buf=io.BytesIO()
+    with pd.ExcelWriter(buf,engine="openpyxl") as w:
+        for name,df in sheets.items(): df.to_excel(w,sheet_name=name[:31],index=False)
     return buf.getvalue()
 
-
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 # SIDEBAR
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════
 
 def sidebar():
     with st.sidebar:
         st.markdown("""
-        <div style="padding:0.5rem 0 1.5rem;">
-          <div style="font-size:1.2rem;font-weight:700;color:#e8e8f0;letter-spacing:-0.02em;">
-            📈 <span style="color:#00d4ff;">FinCast</span> Pro
-          </div>
-          <div style="font-size:0.7rem;color:#8888aa;margin-top:0.2rem;letter-spacing:0.05em;text-transform:uppercase;">
-            FP&A Forecasting Platform
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
+        <div class="sidebar-brand">
+          <div class="sidebar-brand-title">Fin<em>Cast</em> Pro</div>
+          <div class="sidebar-brand-sub">Institutional Forecasting Platform</div>
+        </div>""", unsafe_allow_html=True)
 
-        st.markdown('<div class="section-header">Data Source</div>', unsafe_allow_html=True)
-        data_mode = st.radio("", ["Upload CSV", "Use Sample Data"], label_visibility="collapsed")
+        st.markdown('<span class="sb-section">Data Source</span>', unsafe_allow_html=True)
+        mode = st.radio("",["Upload CSV","Use Sample Data"],label_visibility="collapsed")
 
         df = None
-        if data_mode == "Upload CSV":
-            f = st.file_uploader("Drop your CSV here", type=["csv"],
-                                 help="Required columns: ds (date), y (numeric value)")
+        if mode == "Upload CSV":
+            f = st.file_uploader("CSV with columns: ds, y", type=["csv"],
+                                 label_visibility="collapsed")
             if f:
                 try:
-                    df = pd.read_csv(f, parse_dates=["ds"])
-                    df = df.sort_values("ds").reset_index(drop=True)
-                    st.markdown(f'<span class="badge-success">✓ {len(df)} rows loaded</span>', unsafe_allow_html=True)
+                    df = pd.read_csv(f, parse_dates=["ds"]).sort_values("ds").reset_index(drop=True)
+                    st.markdown(f'<span class="badge badge-green">✓ {len(df):,} rows loaded</span>',
+                                unsafe_allow_html=True)
                 except Exception as e:
                     st.error(f"Parse error: {e}")
         else:
-            asset_type = st.selectbox("Sample dataset", ["Monthly Revenue", "Stock Price"])
-            df = generate_sample_revenue() if asset_type == "Monthly Revenue" else generate_sample_stock()
-            st.markdown(f'<span class="badge-info">Sample · {len(df)} rows</span>', unsafe_allow_html=True)
-
-        if df is None:
-            st.stop()
-
-        st.markdown('<div class="section-header">Forecast Settings</div>', unsafe_allow_html=True)
-        freq_map = {"Monthly": "MS", "Weekly": "W", "Daily (Business)": "B", "Quarterly": "QS"}
-        freq_label = st.selectbox("Data Frequency", list(freq_map.keys()))
-        freq = freq_map[freq_label]
-        horizon_label = {"Monthly": "months", "Weekly": "weeks",
-                         "Daily (Business)": "business days", "Quarterly": "quarters"}
-        max_h = {"Monthly": 24, "Weekly": 52, "Daily (Business)": 252, "Quarterly": 8}
-        horizon = st.slider(f"Forecast horizon ({horizon_label[freq_label]})",
-                            1, max_h[freq_label],
-                            {"Monthly": 12, "Weekly": 26, "Daily (Business)": 60, "Quarterly": 4}[freq_label])
-
-        st.markdown('<div class="section-header">Models</div>', unsafe_allow_html=True)
-        run_prophet_m  = st.checkbox("Prophet (Meta)", value=True)
-        run_arima_m    = st.checkbox("ARIMA / SARIMA", value=True)
-        run_xgb_m      = st.checkbox("XGBoost ML", value=True)
-        run_mc_m       = st.checkbox("Monte Carlo", value=True)
-
-        if run_mc_m:
-            n_sims = st.slider("MC simulations", 200, 5000, 1000, step=200)
-        else:
-            n_sims = 1000
-
-        st.markdown('<div class="section-header">Scenario Engine</div>', unsafe_allow_html=True)
-        scenario = st.select_slider("", options=["worst", "base", "best"], value="base")
-        scenario_color = {"best": "#00ff87", "base": "#00d4ff", "worst": "#ff4757"}[scenario]
-        st.markdown(f'<span class="badge-info" style="border-color:{scenario_color};color:{scenario_color};">'
-                    f'{scenario.upper()} CASE</span>', unsafe_allow_html=True)
-
-        st.markdown('<div class="section-header">Anomaly Detection</div>', unsafe_allow_html=True)
-        iqr_factor = st.slider("IQR sensitivity", 1.0, 4.0, 2.0, 0.5)
-
-        st.markdown("---")
-        run_btn = st.button("⚡  Run Forecast", use_container_width=True)
-
-        return (df, freq, horizon, run_prophet_m, run_arima_m, run_xgb_m, run_mc_m,
-                n_sims, scenario, iqr_factor, run_btn)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# MAIN APP
-# ══════════════════════════════════════════════════════════════════════════════
-
-def main():
-    (df, freq, horizon, run_prophet_m, run_arima_m, run_xgb_m, run_mc_m,
-     n_sims, scenario, iqr_factor, run_btn) = sidebar()
-
-    # ── Header ────────────────────────────────────────────────────────────────
-    st.markdown("""
-    <div class="app-header">
-      <span class="app-title">Fin<span>Cast</span> Pro</span>
-      <span class="app-subtitle">Financial Forecasting & Scenario Planning Platform</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── KPI Row ───────────────────────────────────────────────────────────────
-    series = df["y"]
-    pct_chg = (series.iloc[-1] - series.iloc[0]) / series.iloc[0] * 100
-    recent_chg = (series.iloc[-1] - series.iloc[-2]) / series.iloc[-2] * 100 if len(series) > 1 else 0
-    vol = series.pct_change().std() * 100
-    anom = detect_anomalies_iqr(series, iqr_factor)
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    def kpi(col, label, value, delta=None, delta_pos=True, prefix="", suffix=""):
-        delta_html = ""
-        if delta is not None:
-            cls = "metric-delta-pos" if delta_pos else "metric-delta-neg"
-            arrow = "▲" if delta_pos else "▼"
-            delta_html = f'<div class="{cls}">{arrow} {abs(delta):.2f}%</div>'
-        col.markdown(f"""
-        <div class="metric-card">
-          <div class="metric-label">{label}</div>
-          <div class="metric-value">{prefix}{value}{suffix}</div>
-          {delta_html}
-        </div>""", unsafe_allow_html=True)
-
-    with c1: kpi(c1, "Latest Value", f"{series.iloc[-1]:,.0f}")
-    with c2: kpi(c2, "Period Change", f"{pct_chg:+.1f}", delta=abs(pct_chg), delta_pos=pct_chg>0, suffix="%")
-    with c3: kpi(c3, "Last Δ", f"{recent_chg:+.2f}", delta=abs(recent_chg), delta_pos=recent_chg>0, suffix="%")
-    with c4: kpi(c4, "Volatility (σ)", f"{vol:.2f}", suffix="%")
-    with c5: kpi(c5, "Anomalies", str(anom.sum()))
-
-    # ── Tabs ──────────────────────────────────────────────────────────────────
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📊  Historical Analysis",
-        "🔮  Forecast",
-        "🎲  Monte Carlo",
-        "📐  Model Comparison",
-        "📤  Export",
-    ])
-
-    # ══ TAB 1 — Historical ═══════════════════════════════════════════════════
-    with tab1:
-        st.markdown('<div class="section-header">Historical Data & Anomaly Detection</div>', unsafe_allow_html=True)
-        fig_hist = chart_historical(df, anom, "Historical Series with Anomaly Overlay")
-        st.plotly_chart(fig_hist, use_container_width=True)
-
-        col_a, col_b = st.columns([2, 1])
-        with col_a:
-            st.markdown('<div class="section-header">Return Distribution</div>', unsafe_allow_html=True)
-            fig_ret = chart_returns_distribution(series)
-            st.plotly_chart(fig_ret, use_container_width=True)
-
-        with col_b:
-            st.markdown('<div class="section-header">Descriptive Statistics</div>', unsafe_allow_html=True)
-            stats = pd.DataFrame({
-                "Metric": ["Observations", "Mean", "Median", "Std Dev",
-                            "Min", "Max", "Skewness", "Kurtosis"],
-                "Value": [
-                    f"{len(series):,}",
-                    f"{series.mean():,.2f}",
-                    f"{series.median():,.2f}",
-                    f"{series.std():,.2f}",
-                    f"{series.min():,.2f}",
-                    f"{series.max():,.2f}",
-                    f"{series.skew():.4f}",
-                    f"{series.kurt():.4f}",
-                ]
-            })
-            st.dataframe(stats, hide_index=True, use_container_width=True)
-
-            # Anomalies
-            if anom.sum() > 0:
-                st.markdown('<div class="section-header">Flagged Anomalies</div>', unsafe_allow_html=True)
-                for idx_, row in df[anom].iterrows():
-                    st.markdown(
-                        f'<div class="anomaly-row">📍 {row["ds"].strftime("%Y-%m-%d")} &nbsp;|&nbsp; {row["y"]:,.2f}</div>',
+            sample = st.selectbox("Dataset",["Monthly Revenue","Stock / Asset Price"],
+                                  label_visibility="collapsed")
+            df = gen_revenue() if "Revenue" in sample else gen_stock()
+            st.markdown(f'<span class="badge badge-gold">Sample · {len(df):,} rows</span>',
                         unsafe_allow_html=True)
 
-        # Analyst insight
-        skew = series.skew()
-        insight_text = (
-            f"The series spans <b>{len(df)}</b> observations with a mean of <b>{series.mean():,.0f}</b> "
-            f"and volatility of <b>{vol:.1f}%</b>. "
-            f"{'Positive skew suggests upside tail risk — watch for outlier months.' if skew > 0.5 else 'Negative skew indicates downside tail risk — consider stress testing.' if skew < -0.5 else 'Return distribution is approximately symmetric.'} "
-            f"{'<b>' + str(anom.sum()) + ' anomalous observations</b> were detected — review before forecasting.' if anom.sum() > 0 else 'No significant anomalies found — data quality looks clean.'}"
-        )
-        st.markdown(f'<div class="insight-box">🧠 <b>Analyst Insight:</b><br>{insight_text}</div>',
+        if df is None: st.stop()
+
+        st.markdown('<span class="sb-section">Forecast Parameters</span>', unsafe_allow_html=True)
+        freq_map  = {"Monthly":"MS","Quarterly":"QS","Weekly":"W","Daily (Biz)":"B"}
+        freq_lbl  = st.selectbox("Frequency", list(freq_map.keys()))
+        freq      = freq_map[freq_lbl]
+        max_h     = {"MS":24,"QS":8,"W":52,"B":252}[freq]
+        def_h     = {"MS":12,"QS":4,"W":26,"B":63}[freq]
+        horizon   = st.slider("Horizon (periods)", 1, max_h, def_h)
+
+        st.markdown('<span class="sb-section">Models</span>', unsafe_allow_html=True)
+        c1,c2 = st.columns(2)
+        with c1:
+            use_p = st.checkbox("Prophet",  value=True)
+            use_x = st.checkbox("XGBoost",  value=True)
+        with c2:
+            use_a = st.checkbox("ARIMA",    value=True)
+            use_m = st.checkbox("Monte Carlo", value=True)
+
+        n_sims = st.select_slider("MC Simulations",[500,1000,2000,5000],value=1000) if use_m else 1000
+
+        st.markdown('<span class="sb-section">Scenario Planning</span>', unsafe_allow_html=True)
+        scenario  = st.select_slider("",["Stress","Bear","Base","Bull","Upside"],value="Base")
+        mc_scen   = {"Stress":"worst","Bear":"worst","Base":"base","Bull":"best","Upside":"best"}[scenario]
+        scol      = {"Stress":"#f25f5c","Bear":"#f0a500","Base":"#c8a951","Bull":"#3ecf8e","Upside":"#5b8dee"}[scenario]
+        st.markdown(f'<div style="margin-top:0.3rem;"><span class="badge" style="background:rgba(0,0,0,0.3);color:{scol};border:1px solid {scol}40;letter-spacing:0.1em;">{scenario.upper()}</span></div>',
                     unsafe_allow_html=True)
 
-    # ══ TAB 2 — Forecast ══════════════════════════════════════════════════════
-    with tab2:
-        if not run_btn:
-            st.markdown("""
-            <div style="text-align:center;padding:4rem 0;color:#44445a;">
-              <div style="font-size:3rem;">⚡</div>
-              <div style="font-size:1.1rem;margin-top:1rem;color:#8888aa;">
-                Configure your settings in the sidebar and click <b style="color:#00d4ff;">Run Forecast</b>
-              </div>
-            </div>""", unsafe_allow_html=True)
+        st.markdown('<span class="sb-section">Anomaly Detection</span>', unsafe_allow_html=True)
+        iqr_factor = st.slider("IQR Sensitivity", 1.0, 4.0, 2.0, 0.5)
+
+        st.markdown("---")
+        run = st.button("RUN FORECAST ENGINE", use_container_width=True)
+
+        return df, freq, horizon, use_p, use_a, use_x, use_m, n_sims, mc_scen, scenario, iqr_factor, run
+
+# ═══════════════════════════════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════════════════════════════
+
+def main():
+    df, freq, horizon, use_p, use_a, use_x, use_m, n_sims, mc_scen, scenario, iqr_factor, run = sidebar()
+
+    # Top Bar
+    now = datetime.now()
+    st.markdown(f"""
+    <div class="fincast-topbar">
+      <div style="display:flex;align-items:baseline;gap:0.75rem;">
+        <span class="fincast-logo-mark">Fin<span>Cast</span> Pro</span>
+        <span class="fincast-logo-tag">Institutional Forecasting</span>
+      </div>
+      <div class="fincast-meta">
+        {now.strftime("%A, %d %B %Y")}&nbsp;&nbsp;|&nbsp;&nbsp;{now.strftime("%H:%M")} UTC<br>
+        {len(df):,} obs &nbsp;·&nbsp; {freq} freq &nbsp;·&nbsp; {horizon}-period horizon &nbsp;·&nbsp; {scenario} scenario
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    # Derived KPIs
+    s    = df["y"]
+    mask, lo, hi = detect_anomalies(s, iqr_factor)
+    n_an = int(mask.sum())
+    p_chg = (s.iloc[-1]-s.iloc[0])/s.iloc[0]*100
+    r_chg = (s.iloc[-1]-s.iloc[-2])/s.iloc[-2]*100 if len(s)>1 else 0
+    vol   = s.pct_change().std()*100
+    _cagr = cagr(s,freq)
+    _mdd  = max_drawdown(s)
+    _sh   = sharpe(s,freq)
+
+    rc = "pos" if r_chg>=0 else "neg"
+    pc = "pos" if p_chg>=0 else "neg"
+    dc = "neg" if _mdd<-10 else "neu"
+    sc2= "pos" if _sh>=1  else ("warn" if _sh>=0 else "neg")
+    ac = "warn" if n_an>0 else "pos"
+
+    st.markdown(f"""
+    <div class="kpi-grid">
+      <div class="kpi-cell accent">
+        <div class="kpi-label">Latest Value</div>
+        <div class="kpi-value">{s.iloc[-1]:,.0f}</div>
+        <div class="kpi-sub {rc}">{"▲" if r_chg>=0 else "▼"} {abs(r_chg):.2f}% prior period</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Period Return</div>
+        <div class="kpi-value {pc}">{p_chg:+.1f}%</div>
+        <div class="kpi-sub neu">{len(s):,} observations</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">CAGR</div>
+        <div class="kpi-value">{_cagr:.1f}%</div>
+        <div class="kpi-sub neu">Annualised growth</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Max Drawdown</div>
+        <div class="kpi-value {dc}">{_mdd:.1f}%</div>
+        <div class="kpi-sub neu">Peak-to-trough</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Sharpe Ratio</div>
+        <div class="kpi-value {sc2}">{_sh:.2f}</div>
+        <div class="kpi-sub {ac}">{"⚠ " + str(n_an) + " anomaly" + ("" if n_an==1 else "ies") if n_an else "✓ Clean data"}</div>
+      </div>
+    </div>""", unsafe_allow_html=True)
+
+    # Tabs
+    t1,t2,t3,t4,t5 = st.tabs([
+        "  Data Intelligence  ",
+        "  Forecast Engine  ",
+        "  Risk & Monte Carlo  ",
+        "  Model Validation  ",
+        "  Report Export  ",
+    ])
+
+    # ══════════════════════════════════════════════════
+    # TAB 1 — DATA INTELLIGENCE
+    # ══════════════════════════════════════════════════
+    with t1:
+        sec("Historical Series")
+        st.plotly_chart(fig_historical(df,mask,lo,hi), use_container_width=True)
+
+        ca,cb = st.columns([3,2])
+        with ca:
+            sec("Year-over-Year Growth")
+            st.plotly_chart(fig_yoy(df,freq), use_container_width=True)
+        with cb:
+            sec("Descriptive Statistics")
+            html = "".join([
+                stat("Observations",  f"{len(s):,}"),
+                stat("Mean",          f"{s.mean():,.2f}"),
+                stat("Median",        f"{s.median():,.2f}"),
+                stat("Std Deviation", f"{s.std():,.2f}"),
+                stat("Minimum",       f"{s.min():,.2f}"),
+                stat("Maximum",       f"{s.max():,.2f}"),
+                stat("Skewness",      f"{s.skew():.4f}"),
+                stat("Kurtosis",      f"{s.kurt():.4f}"),
+                stat("Volatility σ",  f"{vol:.2f}%"),
+                stat("CAGR",          f"{_cagr:.2f}%"),
+                stat("Max Drawdown",  f"{_mdd:.2f}%"),
+                stat("Sharpe Ratio",  f"{_sh:.3f}"),
+            ])
+            st.markdown(f'<div class="panel">{html}</div>', unsafe_allow_html=True)
+
+        cc,cd = st.columns([2,3])
+        with cc:
+            sec("Return Distribution")
+            st.plotly_chart(fig_returns(s), use_container_width=True)
+        with cd:
+            sec(f"Anomaly Flags  ·  {n_an} detected")
+            if n_an == 0:
+                sig("bullish","✓","<strong>No anomalies detected.</strong> Data quality check passed at the current IQR sensitivity level.")
+            else:
+                adf = df[mask].copy()
+                adf["pct_dev"] = (adf["y"]-s.mean())/s.mean()*100
+                rows="".join([
+                    f'<div class="anom-row"><span class="anom-date">{r["ds"].strftime("%Y-%m-%d")}</span>'
+                    f'<span class="anom-val">{r["y"]:,.0f}</span>'
+                    f'<span class="anom-dev">{r["pct_dev"]:+.1f}% vs μ</span></div>'
+                    for _,r in adf.iterrows()
+                ])
+                st.markdown(f'<div style="max-height:230px;overflow-y:auto;">{rows}</div>',
+                            unsafe_allow_html=True)
+
+        skew_txt = ("positive skew — upside tail dominates"   if s.skew()>0.5
+                    else "negative skew — downside tail dominates" if s.skew()<-0.5
+                    else "near-symmetric distribution")
+        note(
+            f"Series shows <strong>{skew_txt}</strong>. CAGR of <strong>{_cagr:.1f}%</strong> "
+            f"with annualised volatility <strong>{vol:.1f}%</strong>. Sharpe of "
+            f"<strong>{_sh:.2f}</strong> "
+            + ("— strong risk-adjusted return." if _sh>=1
+               else "— adequate risk compensation." if _sh>=0
+               else "— returns below the risk-free rate; review capital allocation.") +
+            f" Max drawdown <strong>{_mdd:.1f}%</strong>"
+            + (" — consider stop-loss or rebalancing triggers." if _mdd<-20 else ".") +
+            (f" <strong>{n_an} anomalous observation{'s' if n_an!=1 else ''}</strong> detected — "
+             "consider winsorising or excluding before modelling." if n_an
+             else " No anomalies flagged — data is clean for modelling."),
+            head="Data Intelligence Summary"
+        )
+
+    # ══════════════════════════════════════════════════
+    # TAB 2 — FORECAST ENGINE
+    # ══════════════════════════════════════════════════
+    with t2:
+        if not run:
+            empty("Configure parameters and click  RUN FORECAST ENGINE",
+                  "Select models · Set horizon · Choose scenario")
             return
 
-        forecasts   = {}
-        insample    = {}
-        mc_paths    = None
-        mc_fwd      = None
+        fcs, ins_d = {}, {}
+        mc_paths = mc_fwd = None
 
-        with st.spinner("Running models..."):
-            if run_prophet_m:
-                fwd, ins = run_prophet(df, horizon, freq)
-                if fwd is not None:
-                    forecasts["Prophet"] = fwd
-                    insample["Prophet"]  = ins
-                else:
-                    st.warning("Prophet not installed. Run: `pip install prophet`")
+        with st.spinner("Running models — this may take 15–30 seconds…"):
+            if use_p:
+                fwd,ins = run_prophet(df,horizon,freq)
+                if fwd is not None: fcs["Prophet"]=fwd; ins_d["Prophet"]=ins
+                else: st.warning("Prophet not installed: `pip install prophet`")
+            if use_a:
+                fwd,ins = run_arima(df,horizon,freq)
+                if fwd is not None: fcs["ARIMA"]=fwd; ins_d["ARIMA"]=ins
+                else: st.warning("statsmodels not installed.")
+            if use_x:
+                fwd,ins = run_xgboost(df,horizon,freq)
+                if fwd is not None: fcs["XGBoost"]=fwd; ins_d["XGBoost"]=ins
+                else: st.warning("XGBoost not installed.")
+            if use_m:
+                mc_fwd,mc_paths = run_monte_carlo(df,horizon,freq,n_sims,mc_scen)
+                if mc_fwd is not None: fcs["Monte Carlo"]=mc_fwd
 
-            if run_arima_m:
-                fwd, ins = run_arima(df, horizon, freq)
-                if fwd is not None:
-                    forecasts["ARIMA"] = fwd
-                    insample["ARIMA"]  = ins
-                else:
-                    st.warning("statsmodels not installed.")
-
-            if run_xgb_m:
-                fwd, ins = run_xgboost(df, horizon, freq)
-                if fwd is not None:
-                    forecasts["XGBoost"] = fwd
-                    insample["XGBoost"]  = ins
-                else:
-                    st.warning("XGBoost not installed.")
-
-            if run_mc_m:
-                mc_fwd, mc_paths = run_monte_carlo(df, horizon, freq, n_sims, scenario)
-                if mc_fwd is not None:
-                    forecasts["Monte Carlo"] = mc_fwd
-
-        if not forecasts:
-            st.error("No models ran successfully. Please install the required packages.")
+        if not fcs:
+            st.error("No models ran. Install required packages.")
             return
 
-        st.markdown('<div class="section-header">Forecast Chart</div>', unsafe_allow_html=True)
-        fig_fc = chart_forecast(df, forecasts, f"Financial Forecast — {scenario.upper()} Scenario")
-        st.plotly_chart(fig_fc, use_container_width=True)
+        ens = ensemble(fcs)
+        st.session_state.update({
+            "fcs":fcs,"ins_d":ins_d,"mc_paths":mc_paths,"mc_fwd":mc_fwd,"ens":ens
+        })
 
-        # Summary KPIs per model
-        st.markdown('<div class="section-header">Forecast Summary</div>', unsafe_allow_html=True)
-        summary_cols = st.columns(len(forecasts))
-        for i, (name, fwd) in enumerate(forecasts.items()):
-            terminal = fwd["yhat"].iloc[-1]
-            change   = (terminal - series.iloc[-1]) / series.iloc[-1] * 100
-            c_col = {"Prophet": COLORS["prophet"], "ARIMA": COLORS["arima"],
-                     "XGBoost": COLORS["xgb"],    "Monte Carlo": COLORS["monte"]}.get(name, "#fff")
-            summary_cols[i].markdown(f"""
-            <div class="metric-card" style="border-top-color:{c_col};">
-              <div class="metric-label">{name} — {horizon}-step</div>
-              <div class="metric-value" style="font-size:1.35rem;">{terminal:,.0f}</div>
-              <div class="{'metric-delta-pos' if change>0 else 'metric-delta-neg'}">
-                {'▲' if change>0 else '▼'} {abs(change):.1f}% vs last
-              </div>
+        sec("Multi-Model Forecast")
+        st.plotly_chart(fig_forecast(df,fcs,ens), use_container_width=True)
+
+        # Terminal KPI strip
+        sec("Terminal Estimates")
+        all_models = {**fcs, **({"Ensemble":ens} if ens is not None else {})}
+        cols = st.columns(len(all_models))
+        for i,(name,fwd) in enumerate(all_models.items()):
+            t_val = fwd["yhat"].iloc[-1]
+            t_chg = (t_val-s.iloc[-1])/s.iloc[-1]*100
+            col   = model_color(name)
+            cols[i].markdown(f"""
+            <div class="panel" style="border-left:3px solid {col};padding:1rem 1.1rem;">
+              <div class="kpi-label">{name}</div>
+              <div class="kpi-value" style="font-size:1.2rem;">{t_val:,.0f}</div>
+              <div class="kpi-sub {'pos' if t_chg>=0 else 'neg'}">{"▲" if t_chg>=0 else "▼"} {abs(t_chg):.1f}%</div>
+              <div style="font-size:0.63rem;color:var(--cream-muted);margin-top:0.25rem;">{horizon}p · {scenario}</div>
             </div>""", unsafe_allow_html=True)
 
         # Forecast table
-        st.markdown('<div class="section-header">Forecast Table</div>', unsafe_allow_html=True)
-        table_rows = []
-        all_dates = forecasts[list(forecasts.keys())[0]]["ds"]
-        for _, d in enumerate(all_dates):
-            row = {"Date": d.strftime("%Y-%m-%d")}
-            for name, fwd in forecasts.items():
-                match = fwd[fwd["ds"] == d]
-                if not match.empty:
-                    row[f"{name} (Forecast)"] = round(match["yhat"].values[0], 2)
-                    row[f"{name} (Lower)"]    = round(match["lower"].values[0], 2)
-                    row[f"{name} (Upper)"]    = round(match["upper"].values[0], 2)
-            table_rows.append(row)
-        table_df = pd.DataFrame(table_rows)
-        st.dataframe(table_df, hide_index=True, use_container_width=True)
-        st.session_state["forecast_table"] = table_df
+        sec("Forecast Table")
+        rows=[]
+        for d in fcs[list(fcs.keys())[0]]["ds"]:
+            row={"Period":d.strftime("%Y-%m-%d")}
+            for name,fwd in fcs.items():
+                m=fwd[fwd["ds"]==d]
+                if not m.empty:
+                    row[name]=round(m["yhat"].values[0],2)
+                    row[f"{name} Lo"]=round(m["lower"].values[0],2)
+                    row[f"{name} Hi"]=round(m["upper"].values[0],2)
+            if ens is not None:
+                em=ens[ens["ds"]==d]
+                if not em.empty: row["Ensemble"]=round(em["yhat"].values[0],2)
+            rows.append(row)
+        tbl=pd.DataFrame(rows)
+        st.dataframe(tbl,hide_index=True,use_container_width=True)
+        st.session_state["tbl"]=tbl
+        st.session_state["df_h"]=df
 
-    # ══ TAB 3 — Monte Carlo ═══════════════════════════════════════════════════
-    with tab3:
-        if not run_btn:
-            st.markdown('<div style="padding:3rem;text-align:center;color:#44445a;">Run the forecast first.</div>',
-                        unsafe_allow_html=True)
+        # Signals
+        sec("Forecast Signals")
+        if ens is not None:
+            ec = (ens["yhat"].iloc[-1]-s.iloc[-1])/s.iloc[-1]*100
+            if   ec>5:  sig("bullish","▲",f"<strong>Bullish signal:</strong> Consensus projects <strong>+{ec:.1f}%</strong> over {horizon} periods ({scenario} scenario).")
+            elif ec<-5: sig("bearish","▼",f"<strong>Bearish signal:</strong> Consensus projects <strong>{ec:.1f}%</strong> over {horizon} periods.")
+            else:       sig("neutral","◆",f"<strong>Neutral:</strong> Ensemble projects modest <strong>{ec:+.1f}%</strong> movement over {horizon} periods.")
+        if n_an>0:
+            sig("caution","⚠",f"<strong>Data Quality Alert:</strong> {n_an} anomalous observations in training data may widen confidence intervals.")
+
+    # ══════════════════════════════════════════════════
+    # TAB 3 — RISK & MONTE CARLO
+    # ══════════════════════════════════════════════════
+    with t3:
+        if not run:
+            empty("Run the forecast engine first.")
+            return
+        mc_paths = st.session_state.get("mc_paths")
+        mc_fwd   = st.session_state.get("mc_fwd")
+        if not use_m or mc_paths is None:
+            st.info("Enable Monte Carlo in the sidebar to unlock this view.")
             return
 
-        if not run_mc_m or mc_paths is None:
-            st.info("Enable Monte Carlo in the sidebar to see this view.")
-            return
+        dates = mc_fwd["ds"]
+        sec(f"Monte Carlo Fan  ·  {n_sims:,} Simulations  ·  {scenario} Scenario")
+        st.plotly_chart(fig_mc_fan(df,mc_paths,dates), use_container_width=True)
 
-        fwd_dates = mc_fwd["ds"]
-        st.markdown('<div class="section-header">Simulation Fan Chart</div>', unsafe_allow_html=True)
-        fig_mc = chart_monte_carlo_fan(df, mc_paths, fwd_dates, n_show=min(200, n_sims))
-        st.plotly_chart(fig_mc, use_container_width=True)
+        ca,cb = st.columns([3,2])
+        with ca:
+            sec("Terminal Value Distribution")
+            st.plotly_chart(fig_terminal(mc_paths), use_container_width=True)
+        with cb:
+            tv = mc_paths[:,-1]
+            var95  = np.percentile(tv,5)
+            cvar95 = tv[tv<=var95].mean()
+            p_loss = np.mean(tv<s.iloc[-1])*100
+            p_10up = np.mean(tv>s.iloc[-1]*1.1)*100
 
-        col_mc1, col_mc2 = st.columns(2)
-        with col_mc1:
-            st.markdown('<div class="section-header">Outcome Distribution (Terminal)</div>',
-                        unsafe_allow_html=True)
-            terminal_vals = mc_paths[:, -1]
-            fig_term = go.Figure()
-            fig_term.add_trace(go.Histogram(
-                x=terminal_vals, nbinsx=60,
-                marker_color=COLORS["monte"],
-                marker_line=dict(width=0.3, color="#09090f"),
-            ))
-            for p, col, label in [(10, COLORS["arima"], "P10"), (50, "#fff", "Median"), (90, COLORS["red"], "P90")]:
-                fig_term.add_vline(x=np.percentile(terminal_vals, p),
-                                   line_dash="dash", line_color=col, line_width=1.5,
-                                   annotation_text=label,
-                                   annotation_font_color=col,
-                                   annotation_position="top")
-            fig_term.update_layout(**CHART_LAYOUT, showlegend=False,
-                                   title=dict(text="Terminal Value Distribution",
-                                              font=dict(color="#e8e8f0", size=13), x=0.01))
-            st.plotly_chart(fig_term, use_container_width=True)
+            sec("Risk Metrics")
+            rh = "".join([
+                stat("VaR (95%)",       f"{var95:,.0f}"),
+                stat("CVaR / ES (95%)", f"{cvar95:,.0f}"),
+                stat("P(loss)",         f"{p_loss:.1f}%"),
+                stat("P(gain >10%)",    f"{p_10up:.1f}%"),
+                stat("Median",          f"{np.percentile(tv,50):,.0f}"),
+                stat("P10",             f"{np.percentile(tv,10):,.0f}"),
+                stat("P90",             f"{np.percentile(tv,90):,.0f}"),
+                stat("Simulations",     f"{n_sims:,}"),
+                stat("Scenario",        scenario),
+            ])
+            st.markdown(f'<div class="panel">{rh}</div>', unsafe_allow_html=True)
 
-        with col_mc2:
-            st.markdown('<div class="section-header">Risk Summary Table</div>', unsafe_allow_html=True)
-            pctls = [5, 10, 25, 50, 75, 90, 95]
-            risk_data = pd.DataFrame({
-                "Percentile": [f"P{p}" for p in pctls],
-                "Terminal Value": [f"{np.percentile(terminal_vals, p):,.0f}" for p in pctls],
-                "vs Last Actual": [f"{(np.percentile(terminal_vals, p)/series.iloc[-1]-1)*100:+.1f}%" for p in pctls],
+            sec("Percentile Table")
+            pdf = pd.DataFrame({
+                "Pctl": [f"P{p}" for p in [1,5,10,25,50,75,90,95,99]],
+                "Value": [f"{np.percentile(tv,p):,.0f}" for p in [1,5,10,25,50,75,90,95,99]],
+                "vs Last": [f"{(np.percentile(tv,p)/s.iloc[-1]-1)*100:+.1f}%" for p in [1,5,10,25,50,75,90,95,99]],
             })
-            st.dataframe(risk_data, hide_index=True, use_container_width=True)
+            st.dataframe(pdf, hide_index=True, use_container_width=True)
 
-            var_95 = np.percentile(terminal_vals, 5)
-            prob_loss = np.mean(terminal_vals < series.iloc[-1]) * 100
-            st.markdown(f"""
-            <div class="insight-box">
-              🎲 <b>Risk Metrics</b><br>
-              <b>VaR (95%)</b>: {var_95:,.0f} &nbsp;|&nbsp;
-              <b>Prob. of Loss</b>: {prob_loss:.1f}% &nbsp;|&nbsp;
-              <b>Scenario</b>: {scenario.upper()}<br>
-              Based on {n_sims:,} simulated paths over {horizon} steps.
-            </div>""", unsafe_allow_html=True)
+        note(
+            f"<strong>{n_sims:,} GBM simulations</strong> under <strong>{scenario}</strong> scenario. "
+            f"VaR (95%): <strong>{var95:,.0f}</strong> · CVaR: <strong>{cvar95:,.0f}</strong>. "
+            f"Probability of decline: <strong>{p_loss:.1f}%</strong>. "
+            f"Probability of +10% gain: <strong>{p_10up:.1f}%</strong>. "
+            + ("Recommend stress-testing under alternative macro assumptions." if scenario=="Base" else
+               f"The {scenario} scenario applies adjusted drift and volatility parameters."),
+            head="Risk & Simulation Summary"
+        )
 
-    # ══ TAB 4 — Model Comparison ══════════════════════════════════════════════
-    with tab4:
-        if not run_btn or not insample:
-            st.markdown('<div style="padding:3rem;text-align:center;color:#44445a;">Run the forecast first.</div>',
-                        unsafe_allow_html=True)
+    # ══════════════════════════════════════════════════
+    # TAB 4 — MODEL VALIDATION
+    # ══════════════════════════════════════════════════
+    with t4:
+        if not run:
+            empty("Run the forecast engine first.")
+            return
+        ins_d = st.session_state.get("ins_d",{})
+        if not ins_d:
+            st.info("Select at least one parametric model (Prophet / ARIMA / XGBoost).")
             return
 
-        scores = {}
-        for name, ins_df in insample.items():
-            merged = df.merge(ins_df, on="ds", how="inner")
+        scores={}
+        for name,ins in ins_d.items():
+            merged=df.merge(ins,on="ds",how="inner")
             if merged.empty: continue
-            actual_vals = merged["y"].values
-            pred_vals   = merged["y_pred"].values
-            scores[name] = {
-                "MAPE":  round(mape(actual_vals, pred_vals), 3),
-                "SMAPE": round(smape(actual_vals, pred_vals), 3),
-                "RMSE":  round(rmse(actual_vals, pred_vals), 2),
-            }
+            a,f_=merged["y"].values,merged["y_pred"].values
+            scores[name]={"MAPE":round(mape(a,f_),3),"sMAPE":round(smape(a,f_),3),"RMSE":round(rmse(a,f_),2)}
+        st.session_state["scores"]=scores
 
-        if scores:
-            best_model = min(scores, key=lambda m: scores[m]["MAPE"])
-            st.markdown('<div class="section-header">Model Accuracy Scores (In-Sample)</div>',
-                        unsafe_allow_html=True)
-            st.plotly_chart(chart_model_errors(scores), use_container_width=True)
+        if not scores:
+            st.warning("Could not compute scores.")
+            return
 
-            # Table
-            rows_html = ""
-            for name, s in scores.items():
-                is_best = name == best_model
-                best_tag = '<span class="best-label">BEST</span>' if is_best else ""
-                row_cls = 'class="best-model"' if is_best else ""
-                rows_html += f"""<tr {row_cls}>
-                  <td>{name}{best_tag}</td>
-                  <td>{s['MAPE']:.3f}%</td>
-                  <td>{s['SMAPE']:.3f}%</td>
-                  <td>{s['RMSE']:,.2f}</td>
-                </tr>"""
+        ranked=sorted(scores,key=lambda m:scores[m]["MAPE"])
+        icons=["gold","silver","bronze"]
 
-            st.markdown(f"""
-            <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem;">
-              <table class="model-table">
-                <thead><tr>
-                  <th>Model</th><th>MAPE (%)</th><th>sMAPE (%)</th><th>RMSE</th>
-                </tr></thead>
-                <tbody>{rows_html}</tbody>
-              </table>
-            </div>""", unsafe_allow_html=True)
+        sec("Model Leaderboard")
+        rows_html=""
+        for i,name in enumerate(ranked):
+            sc=scores[name]
+            col=model_color(name)
+            conf=max(0,min(100,100-sc["MAPE"]*5))
+            best_tag='<span class="badge badge-gold" style="margin-left:0.5rem;">BEST FIT</span>' if i==0 else ""
+            rows_html+=f"""<tr {"class='lb-winner'" if i==0 else ""}>
+              <td><span class="lb-rank {icons[i] if i<3 else ''}  ">{i+1}</span>
+                  <span class="model-dot" style="background:{col};"></span>{name}{best_tag}</td>
+              <td>{sc['MAPE']:.3f}%</td><td>{sc['sMAPE']:.3f}%</td><td>{sc['RMSE']:,.2f}</td>
+              <td><div style="display:flex;align-items:center;gap:6px;">
+                <div style="width:{conf:.0f}px;height:4px;background:{col};border-radius:2px;max-width:80px;"></div>
+                <span style="font-size:0.7rem;color:var(--cream-muted);">{conf:.0f}/100</span>
+              </div></td></tr>"""
+        st.markdown(f"""
+        <div class="panel">
+          <table class="lb-table">
+            <thead><tr><th>Model</th><th>MAPE (%)</th><th>sMAPE (%)</th><th>RMSE</th><th>Confidence</th></tr></thead>
+            <tbody>{rows_html}</tbody>
+          </table>
+        </div>""", unsafe_allow_html=True)
 
-            st.markdown(f"""
-            <div class="insight-box" style="margin-top:1rem;">
-              🏆 <b>Recommendation:</b> <b>{best_model}</b> achieved the lowest MAPE of
-              <b>{scores[best_model]['MAPE']:.2f}%</b> on in-sample data.
-              For production deployment, validate on a held-out test window and ensemble
-              the top two models to reduce forecast variance.
-            </div>""", unsafe_allow_html=True)
+        sec("Accuracy Comparison")
+        st.plotly_chart(fig_accuracy(scores), use_container_width=True)
 
-            # In-sample fit plot
-            st.markdown('<div class="section-header">In-Sample Fit Overlay</div>', unsafe_allow_html=True)
-            fig_fit = go.Figure()
-            fig_fit.add_trace(go.Scatter(
-                x=df["ds"], y=df["y"], mode="lines",
-                line=dict(color=COLORS["actual"], width=2),
-                name="Actual",
-            ))
-            color_map = {"Prophet": COLORS["prophet"], "ARIMA": COLORS["arima"],
-                         "XGBoost": COLORS["xgb"]}
-            for name, ins_df in insample.items():
-                fig_fit.add_trace(go.Scatter(
-                    x=ins_df["ds"], y=ins_df["y_pred"], mode="lines",
-                    line=dict(color=color_map.get(name, "#fff"), width=1.5, dash="dot"),
-                    name=f"{name} Fit",
-                ))
-            fig_fit.update_layout(**CHART_LAYOUT,
-                                  title=dict(text="In-Sample Fit vs Actual",
-                                             font=dict(color="#e8e8f0", size=14), x=0.01))
-            st.plotly_chart(fig_fit, use_container_width=True)
+        sec("In-Sample Fit vs Actual")
+        st.plotly_chart(fig_fit(df,ins_d), use_container_width=True)
 
-        st.session_state["scores"] = scores
+        best=ranked[0]
+        gap_txt=""
+        if len(ranked)>1:
+            gap=abs(scores[ranked[0]]["MAPE"]-scores[ranked[1]]["MAPE"])
+            gap_txt=f" Gap to runner-up: <strong>{gap:.2f}pp</strong> — " + \
+                    ("models closely matched; ensemble recommended." if gap<1 else "prefer the top model.")
+        note(
+            f"<strong>{best}</strong> achieves the lowest MAPE of <strong>{scores[best]['MAPE']:.2f}%</strong> "
+            f"and RMSE of <strong>{scores[best]['RMSE']:,.2f}</strong> on in-sample data.{gap_txt} "
+            "Recommended next steps: <strong>(1)</strong> Walk-forward validation on the last 20% of data. "
+            "<strong>(2)</strong> Ensemble the top two models to reduce out-of-sample variance. "
+            "<strong>(3)</strong> Retrain on a rolling window to capture regime shifts.",
+            head="Validation & Deployment Guidance"
+        )
 
-    # ══ TAB 5 — Export ════════════════════════════════════════════════════════
-    with tab5:
-        st.markdown('<div class="section-header">Export Forecast Outputs</div>', unsafe_allow_html=True)
+    # ══════════════════════════════════════════════════
+    # TAB 5 — REPORT EXPORT
+    # ══════════════════════════════════════════════════
+    with t5:
+        sec("Download Outputs")
+        ds = datetime.today().strftime("%Y%m%d")
+        tbl = st.session_state.get("tbl")
+        hist_exp = df.copy()
+        hist_exp["anomaly_flag"] = mask.astype(int)
 
-        ex_col1, ex_col2 = st.columns(2)
-        with ex_col1:
-            st.markdown('<div class="insight-box">📄 <b>Forecast Table (CSV)</b><br>Download the full forecast table with all models, confidence intervals, and dates.</div>',
-                        unsafe_allow_html=True)
-            if "forecast_table" in st.session_state:
-                st.download_button(
-                    "Download Forecast CSV",
-                    data=to_csv_bytes(st.session_state["forecast_table"]),
-                    file_name=f"fincast_forecast_{datetime.today().strftime('%Y%m%d')}.csv",
-                    mime="text/csv",
-                )
+        c1,c2,c3 = st.columns(3)
+        with c1:
+            st.markdown('<div class="export-card">', unsafe_allow_html=True)
+            st.markdown('<div class="export-card-title">📄 Forecast Table — CSV</div>', unsafe_allow_html=True)
+            st.markdown('<div class="export-card-desc">All models with confidence intervals. Compatible with Excel, Tableau, PowerBI, and Python.</div>', unsafe_allow_html=True)
+            if tbl is not None:
+                st.download_button("↓ Download CSV", to_csv(tbl),
+                                   f"FinCast_Forecast_{ds}.csv","text/csv")
             else:
-                st.info("Run the forecast first.")
+                st.caption("Run forecast first.")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-        with ex_col2:
-            st.markdown('<div class="insight-box">📊 <b>Historical Data (CSV)</b><br>Export the cleaned historical dataset used for modelling.</div>',
-                        unsafe_allow_html=True)
-            st.download_button(
-                "Download Historical CSV",
-                data=to_csv_bytes(df),
-                file_name=f"fincast_historical_{datetime.today().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
+        with c2:
+            st.markdown('<div class="export-card">', unsafe_allow_html=True)
+            st.markdown('<div class="export-card-title">📊 Historical Data — CSV</div>', unsafe_allow_html=True)
+            st.markdown('<div class="export-card-desc">Cleaned historical series with anomaly flags. Ready for audit trail and data lineage.</div>', unsafe_allow_html=True)
+            st.download_button("↓ Download CSV", to_csv(hist_exp),
+                               f"FinCast_Historical_{ds}.csv","text/csv")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with c3:
+            st.markdown('<div class="export-card">', unsafe_allow_html=True)
+            st.markdown('<div class="export-card-title">📁 Full Report — Excel</div>', unsafe_allow_html=True)
+            st.markdown('<div class="export-card-desc">Multi-sheet workbook: Historical · Forecast · Model Scores · MC Summary. Board-deck ready.</div>', unsafe_allow_html=True)
+            if tbl is not None:
+                sheets={"Historical":hist_exp,"Forecast":tbl}
+                sc=st.session_state.get("scores",{})
+                if sc:
+                    sdf=pd.DataFrame(sc).T.reset_index()
+                    sdf.columns=["Model","MAPE","sMAPE","RMSE"]
+                    sheets["Model Accuracy"]=sdf
+                mc_fwd2=st.session_state.get("mc_fwd")
+                if mc_fwd2 is not None: sheets["MC Summary"]=mc_fwd2[["ds","yhat","lower","upper"]]
+                st.download_button("↓ Download Excel",to_excel(sheets),
+                                   f"FinCast_Report_{ds}.xlsx",
+                                   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            else:
+                st.caption("Run forecast first.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        if tbl is not None:
+            sec("Report Summary")
+            sc=st.session_state.get("scores",{})
+            best_m=min(sc,key=lambda m:sc[m]["MAPE"]) if sc else "N/A"
+            ens2=st.session_state.get("ens")
+            ens_t=f"{ens2['yhat'].iloc[-1]:,.0f}" if ens2 is not None else "N/A"
+            note(
+                f"Report generated <strong>{now.strftime('%d %B %Y, %H:%M UTC')}</strong>. "
+                f"Dataset: <strong>{len(df):,} observations</strong> · {freq} frequency. "
+                f"Horizon: <strong>{horizon} periods</strong> · <strong>{scenario}</strong> scenario. "
+                f"Best-fit model: <strong>{best_m}</strong>"
+                + (f" (MAPE {sc[best_m]['MAPE']:.2f}%)" if best_m!="N/A" else "") + ". "
+                f"Ensemble terminal: <strong>{ens_t}</strong>. "
+                f"CAGR <strong>{_cagr:.1f}%</strong> · MDD <strong>{_mdd:.1f}%</strong> · Sharpe <strong>{_sh:.2f}</strong>. "
+                + (f"<strong>{n_an} anomalies</strong> flagged." if n_an else "No anomalies detected."),
+                head="Automated Report Summary"
             )
 
-        if "forecast_table" in st.session_state:
-            st.markdown('<div class="section-header">Excel Export (All Sheets)</div>', unsafe_allow_html=True)
-            sheets = {
-                "Historical": df,
-                "Forecast": st.session_state["forecast_table"],
-            }
-            if "scores" in st.session_state and st.session_state["scores"]:
-                scores_df = pd.DataFrame(st.session_state["scores"]).T.reset_index()
-                scores_df.columns = ["Model", "MAPE", "SMAPE", "RMSE"]
-                sheets["Model Scores"] = scores_df
-            st.download_button(
-                "📥  Download Full Excel Report",
-                data=to_excel_bytes(sheets),
-                file_name=f"FinCast_Report_{datetime.today().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-            st.markdown("""
-            <div class="insight-box" style="margin-top:1rem;">
-              💼 <b>Board-Ready Export:</b> The Excel file contains three sheets —
-              Historical data, full forecast table with confidence intervals,
-              and model accuracy scores. Ready to paste into any board deck or budget review.
-            </div>""", unsafe_allow_html=True)
-
-
-if __name__ == "__main__":
+if __name__=="__main__":
     main()
