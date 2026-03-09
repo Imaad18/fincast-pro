@@ -208,9 +208,11 @@ def fig_hist(df, mask, lo, hi):
         adf=df[mask]
         fig.add_trace(go.Scatter(x=adf["ds"],y=adf["y"],mode="markers",name="Anomaly",
             marker=dict(color=NEG,size=10,symbol="circle-open",line=dict(width=2,color=NEG))))
-    fig.add_hline(y=df["y"].mean(),line_dash="dot",line_color=BD2,line_width=1,
-                  annotation_text=f"Mean {df['y'].mean():,.0f}",
-                  annotation_font_color=CMT,annotation_font_size=10,annotation_position="bottom right")
+    mean_val = df["y"].mean()
+    fig.add_hline(y=mean_val, line_dash="dot", line_color=BD2, line_width=1)
+    fig.add_annotation(x=1, y=mean_val, xref="paper", text=f"Mean {mean_val:,.0f}",
+                       showarrow=False, font=dict(color=CMT, size=10),
+                       xanchor="right", yanchor="bottom")
     fig.update_layout(**cl(title=ttl("Historical Series · Anomaly Detection"),height=340))
     return fig
 
@@ -229,10 +231,12 @@ def fig_returns(s):
     fig=go.Figure()
     fig.add_trace(go.Histogram(x=r,nbinsx=50,marker_color=f"rgba(200,169,81,0.65)",
                                marker_line_width=0,name="Returns"))
-    fig.add_vline(x=r.mean(),line_dash="dash",line_color=POS,line_width=1.5,
-                  annotation_text=f"μ={r.mean():.2f}%",annotation_font_color=POS,
-                  annotation_font_size=10,annotation_position="top right")
-    fig.add_vline(x=0,line_dash="solid",line_color=BD2,line_width=1)
+    mean_r = float(r.mean())
+    fig.add_vline(x=mean_r, line_dash="dash", line_color=POS, line_width=1.5)
+    fig.add_annotation(x=mean_r, y=1, yref="paper", text=f"μ={mean_r:.2f}%",
+                       showarrow=False, font=dict(color=POS, size=10),
+                       xanchor="left", yanchor="top", xshift=4)
+    fig.add_vline(x=0.0, line_dash="solid", line_color=BD2, line_width=1)
     fig.update_layout(**cl(title=ttl("Return Distribution (%)"),height=290,showlegend=False))
     return fig
 
@@ -240,9 +244,7 @@ def fig_forecast(df, forecasts, ens):
     fig=go.Figure()
     fig.add_trace(go.Scatter(x=df["ds"],y=df["y"],mode="lines",name="Actual",
                              line=dict(color=CDM,width=2)))
-    fig.add_vline(x=df["ds"].max(),line_dash="dot",line_color=BD2,line_width=1.5,
-                  annotation_text="Forecast →",annotation_font_color=CMT,
-                  annotation_font_size=10,annotation_position="top right")
+    fig.add_vline(x=df["ds"].max(), line_dash="dot", line_color=BD2, line_width=1.5)
     for name in ["Prophet","ARIMA","XGBoost","Monte Carlo"]:
         fwd=forecasts.get(name)
         if fwd is None: continue
@@ -283,9 +285,11 @@ def fig_terminal(paths):
     fig.add_trace(go.Histogram(x=t,nbinsx=70,marker_color="rgba(242,95,92,0.55)",
                                marker_line_width=0))
     for p,col,lbl in [(5,NEG,"P5 VaR"),(50,CR,"Median"),(95,POS,"P95")]:
-        fig.add_vline(x=np.percentile(t,p),line_dash="dash",line_color=col,line_width=1.5,
-                      annotation_text=lbl,annotation_font_color=col,
-                      annotation_font_size=10,annotation_position="top")
+        pval = float(np.percentile(t,p))
+        fig.add_vline(x=pval, line_dash="dash", line_color=col, line_width=1.5)
+        fig.add_annotation(x=pval, y=1, yref="paper", text=lbl,
+                           showarrow=False, font=dict(color=col, size=10),
+                           xanchor="left", yanchor="top", xshift=4)
     fig.update_layout(**cl(title=ttl("Terminal Value Distribution"),height=300,showlegend=False))
     return fig
 
