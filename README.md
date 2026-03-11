@@ -1,3 +1,6 @@
+<img width="3712" height="1152" alt="Gemini_Generated_Image_dmg6qodmg6qodmg6" src="https://github.com/user-attachments/assets/8a4c5037-3348-4a96-ba7b-9c7a1b0ea6bb" />
+
+
 # FinCast Pro
 
 **Institutional-grade time series forecasting dashboard**
